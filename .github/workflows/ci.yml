@@ -75,7 +75,9 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: [web, jobs, db]
     runs-on: ubuntu-latest
+    # Job-level permissions replace the workflow's, so contents: read has to be repeated for checkout.
     permissions:
+      contents: read
       pages: write
       id-token: write
     concurrency:
