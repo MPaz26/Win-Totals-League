@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { rows, rpc, supabase } from "./supabase";
-import type { League, LeaguePreview, Member, Pick, ScoreRow, Standing, Team } from "./types";
+import type { CommunityRank, League, LeaguePreview, LpSettings, Member, Pick, ScoreRow, Standing, Suggestion, Team } from "./types";
 
 // ESPN convention: 2027 = the 2026-27 season. Keep in step with NBA_SEASON in the standings job.
 export const SEASON = 2027;
@@ -31,6 +31,53 @@ export function useWeeklyRecap(userId: string) {
         supabase.from("email_preferences").select("weekly_recap").eq("user_id", userId).maybeSingle(),
       );
       return row?.weekly_recap ?? true;
+    },
+  });
+}
+
+// League Pass. Games and scores change once a day (the morning load), so these stay fresh a while.
+
+/** The caller's saved order as team ids, favorite first; null until they've saved one. */
+export function useLpRankings(userId: string) {
+  return useQuery({
+    queryKey: ["lpRankings", userId],
+    queryFn: async () => {
+      const data = await rows<{ team_id: number }[]>(
+        supabase.from("lp_rankings").select("team_id").eq("user_id", userId).order("rank"),
+      );
+      return data.length ? data.map((r) => r.team_id) : null;
+    },
+  });
+}
+
+export function useCommunityRankings() {
+  return useQuery({
+    queryKey: ["lpCommunity"],
+    staleTime: 10 * 60_000,
+    queryFn: () => rpc<CommunityRank[]>("lp_community_rankings"),
+  });
+}
+
+/** One (Eastern) day's games scored for the caller, best first. */
+export function useLpSuggestions(date: string) {
+  return useQuery({
+    queryKey: ["lpSuggestions", date],
+    staleTime: 10 * 60_000,
+    queryFn: () => rpc<Suggestion[]>("lp_suggestions", { p_from: date, p_to: date }),
+  });
+}
+
+export const LP_DEFAULTS: LpSettings = { hide_scores: true, notify_daily: true, notify_must_watch: true };
+
+/** No row yet means the defaults. */
+export function useLpSettings(userId: string) {
+  return useQuery({
+    queryKey: ["lpSettings", userId],
+    queryFn: async () => {
+      const row = await rows<LpSettings | null>(
+        supabase.from("lp_settings").select("hide_scores, notify_daily, notify_must_watch").eq("user_id", userId).maybeSingle(),
+      );
+      return row ?? LP_DEFAULTS;
     },
   });
 }

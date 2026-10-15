@@ -43,6 +43,8 @@ insert into auth.users (id, email) values
   (:'a', 'a@x.test'), (:'b', 'b@x.test'), (:'c', 'c@x.test'), (:'d', 'd@x.test');
 insert into public.profiles (id, username) values
   (:'a', 'Alice'), (:'b', 'Bob'), (:'c', 'Cara'), (:'d', 'Dan');
+-- Lets the on-the-clock trigger queue pushes (into the shim's net.test_requests).
+insert into private.push_config (project_url, secret) values ('https://proj.supabase.co', 'shh');
 
 \set QUIET off
 \echo '--- lobby'
@@ -99,6 +101,13 @@ select public.make_pick(:'league', 8::smallint);                          -- pic
 select public.make_pick(:'league', 2::smallint);                          -- pick 4: Bob again (snake)
 select test.check((select array_agg(user_id order by pick_number) = array[:'c', :'a', :'b', :'b']::uuid[]
                      from public.draft_picks where league_id = :'league'), 'snake order C,A,B,B');
+reset role;
+select test.check((select array_agg((body->'messages'->0->>'user_id')::uuid order by id) = array[:'c', :'a', :'b', :'a']::uuid[]
+                     from net.test_requests), 'on-the-clock pushes C,A,B,A (none for Bob''s back-to-back turn)');
+select test.check((select url = 'https://proj.supabase.co/functions/v1/send-push' and headers->>'x-push-secret' = 'shh'
+                          and body->'messages'->0->>'body' = 'Test League: pick 5, round 2. 30 seconds to pick.'
+                     from net.test_requests order by id desc limit 1), 'push goes to send-push with the secret and pick details');
+set role authenticated;
 
 select test.check(not public.autopick_if_expired(:'league'), 'no autopick before the deadline');
 reset role;
@@ -125,6 +134,11 @@ set role authenticated;
 
 select test.check((select status = 'complete' and pick_deadline is null from public.leagues where id = :'league'),
                   'draft completes after 30 picks');
+reset role;
+-- Picks 6 and 7 are both Cara's; pick 6 was an autopick, so she isn't watching and still gets told.
+select test.check((select count(*) = 1 from net.test_requests where body->'messages'->0->>'body' like 'Test League: pick 7,%'),
+                  'back-to-back turn after an autopick still notifies');
+set role authenticated;
 select test.check((select count(*) = 30 and count(distinct team_id) = 30
                      from public.draft_picks where league_id = :'league'), 'all 30 teams drafted once');
 select test.check((select array_agg(teams order by teams) = array[10, 10, 10]
@@ -259,5 +273,35 @@ select test.expect_error(format('update public.profiles set created_at = now() w
 select test.check((select username = 'Bobby' and teams > 0 from public.league_scoreboard where league_id = :'league' and user_id = :'b'),
                   'renamed user keeps their picks (joined by id, not name)');
 reset role;
+
+\set QUIET off
+\echo '--- push subscriptions'
+\set QUIET on
+
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'a')::text, false);
+select public.save_push_subscription('https://push.example/1', 'key', 'auth');
+select test.check((select count(*) = 1 and min(user_id::text) = :'a' from public.push_subscriptions), 'user saves a device');
+select test.expect_error(format('insert into public.push_subscriptions values (%L, %L, %L, %L)', 'https://push.example/2', :'a', 'k', 'x'),
+                         'permission denied');
+select set_config('request.jwt.claims', json_build_object('sub', :'b')::text, false);
+select test.check((select count(*) = 0 from public.push_subscriptions), 'cannot see another user''s devices');
+select public.delete_push_subscription('https://push.example/1');
+reset role;
+select test.check((select count(*) = 1 from public.push_subscriptions), 'cannot delete another user''s device by endpoint');
+set role authenticated;
+select public.save_push_subscription('https://push.example/1', 'key2', 'auth2');
+select test.check((select count(*) = 1 and min(user_id::text) = :'b' and min(p256dh) = 'key2' from public.push_subscriptions),
+                  'a device moves to whoever turns notifications on there');
+select public.delete_push_subscription('https://push.example/1');
+select test.check((select count(*) = 0 from public.push_subscriptions), 'user removes own device');
+select test.expect_error($$select private.send_push('[]')$$, 'permission denied');
+select test.expect_error('select * from private.push_config', 'permission denied');
+reset role;
+
+delete from private.push_config;
+select count(*) as queued from net.test_requests \gset
+select private.send_push('[{"user_id": "00000000-0000-0000-0000-00000000000a"}]');
+select test.check((select count(*) = :queued from net.test_requests), 'nothing is queued until push is configured');
 
 \echo 'ALL TESTS PASSED'

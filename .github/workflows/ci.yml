@@ -4,6 +4,7 @@
 #
 # Repository variables (Settings -> Secrets and variables -> Actions -> Variables):
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY   public values, baked into the build
+#   VAPID_PUBLIC_KEY                            public push key; unset hides the notifications setting
 name: CI
 
 on:
@@ -47,7 +48,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
 
-  # Same as `make test-db`: plain Postgres + the Supabase shim, pg_cron migration skipped.
+  # Same as `make test-db`: plain Postgres + the Supabase shim, pg_cron and pg_net migrations skipped.
   db:
     runs-on: ubuntu-latest
     services:
@@ -67,9 +68,10 @@ jobs:
       - run: psql -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_shim.sql
       - run: |
           for f in supabase/migrations/*.sql; do
-            case "$f" in *cron*) ;; *) psql -v ON_ERROR_STOP=1 -q -f "$f";; esac
+            case "$f" in *cron*|*pg_net*) ;; *) psql -v ON_ERROR_STOP=1 -q -f "$f";; esac
           done
       - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/draft_test.sql
+      - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/league_pass_test.sql
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -99,6 +101,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
           # Project sites live at /<repo>/; configure-pages reports the exact path.
           BASE_PATH: ${{ steps.pages.outputs.base_path }}/
         run: |

@@ -7,6 +7,7 @@
   },
   "scripts": {
     "update-standings": "node src/update-standings.ts",
+    "update-games": "node src/update-games.ts",
     "weekly-recap": "node src/weekly-recap.ts",
     "typecheck": "tsc"
   },

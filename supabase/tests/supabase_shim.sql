@@ -17,3 +17,12 @@ create function auth.uid() returns uuid language sql stable as $$
 $$;
 
 create publication supabase_realtime;
+
+-- pg_net stand-in: records requests instead of sending them, so tests can inspect them.
+create schema net;
+create table net.test_requests (id bigserial primary key, url text, body jsonb, headers jsonb);
+create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
+                              headers jsonb default '{}', timeout_milliseconds int default 5000)
+returns bigint language sql as $$
+  insert into net.test_requests (url, body, headers) values (url, body, headers) returning id;
+$$;

@@ -70,6 +70,17 @@ export function subject(r: Recap): string {
   return `${r.leagueName}: you're ${ordinal(r.me.place)} (${r.me.wins}–${r.me.losses})`;
 }
 
+/** The lock-screen version: where you stand, and who's ahead if it isn't you. */
+export function pushText(r: Recap): { title: string; body: string } {
+  const leader = r.standings[0];
+  const week = r.me.weekWins !== null ? `, +${r.me.weekWins} this week` : "";
+  const chase = r.me.place > 1 && leader ? ` ${name(leader)} leads at ${leader.wins}–${leader.losses}.` : "";
+  return {
+    title: `${r.leagueName} weekly recap`,
+    body: `You're ${ordinal(r.me.place)} at ${r.me.wins}–${r.me.losses}${week}.${chase}`,
+  };
+}
+
 export function renderText(r: Recap): string {
   const lines = [
     `${r.leagueName} weekly recap${r.period ? ` (${r.period})` : ""}`,

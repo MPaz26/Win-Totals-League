@@ -13,6 +13,7 @@ FROM deps AS build
 # Vite inlines VITE_* at build time; the anon key is public by design (RLS protects the data).
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_VAPID_PUBLIC_KEY
 COPY . .
 RUN npm run build
 

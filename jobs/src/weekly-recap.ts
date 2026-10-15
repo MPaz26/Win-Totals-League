@@ -1,9 +1,10 @@
-// Weekly recap email (scheduled GitHub Actions workflow, or `make recap`).
+// Weekly recap email and push notification (scheduled GitHub Actions workflow, or `make recap`).
 //
 // For every drafted league, emails each opted-in member the league standings, their own
 // teams, and wins gained since the standings snapshot from a week ago. Sends through Gmail
-// SMTP with an app password. Skips the whole run before the season starts and in weeks with
-// no games. Each sent email is recorded in recap_sends, so re-running never double-sends.
+// SMTP with an app password. Members who turned on notifications also get a one-line push,
+// sent through the send-push Edge Function. Skips the whole run before the season starts and
+// in weeks with no games. Each send is recorded in recap_sends, so re-running never double-sends.
 //
 // Env:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  required
@@ -11,6 +12,7 @@
 //   GMAIL_USER          the sending Gmail address; required unless DRY_RUN=1
 //   GMAIL_APP_PASSWORD  an app password for it (needs 2-Step Verification); required unless DRY_RUN=1
 //   EMAIL_FROM_NAME     display name on the From line (default "Win Totals")
+//   PUSH_SECRET         the send-push function's secret; unset skips push notifications
 //   NBA_SEASON          ESPN season year (2027 = 2026-27)
 //   DRY_RUN=1           build everything, send nothing
 //   PREVIEW_DIR         with DRY_RUN, write each email's HTML here
@@ -22,7 +24,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { nbaDate, requireEnv } from "./lib.ts";
-import { renderHtml, renderText, subject, type Recap, type RecapRow } from "./recap-email.ts";
+import { pushText, renderHtml, renderText, subject, type Recap, type RecapRow } from "./recap-email.ts";
 
 const SEASON = Number(process.env.NBA_SEASON ?? "2027");
 const DRY_RUN = process.env.DRY_RUN === "1";
@@ -41,6 +43,14 @@ interface Outgoing {
   key: string;
   to: string;
   recap: Recap;
+}
+
+interface PushMessage {
+  user_id: string;
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
 }
 
 async function main() {
@@ -104,6 +114,8 @@ async function main() {
   const tokens = await unsubscribeTokens(db, recipients);
 
   const outgoing: Outgoing[] = [];
+  // Keyed like the emails. Push is opted into per device, so the email opt-out doesn't apply.
+  const pushes: { key: string; message: PushMessage }[] = [];
   let optedOut = 0;
   for (const league of leagues) {
     const leagueMembers = members.filter((m) => m.league_id === league.id);
@@ -148,8 +160,13 @@ async function main() {
     }
     for (const m of leagueMembers) {
       const me = standings.find((s) => s.userId === m.user_id);
+      if (!me) continue;
+      pushes.push({
+        key: `recap-push/${today}/${league.id}/${m.user_id}`,
+        message: { user_id: m.user_id, ...pushText(recapFor(me)), url: `league/${league.id}`, tag: `recap-${league.id}` },
+      });
       const to = emails.get(m.user_id);
-      if (!me || !to) continue;
+      if (!to) continue;
       if (!tokens.get(m.user_id)!.weekly_recap) {
         optedOut++;
         continue;
@@ -159,7 +176,7 @@ async function main() {
   }
 
   console.log(
-    `${leagues.length} league(s), ${outgoing.length} email(s) to send, ${optedOut} opted out.` +
+    `${leagues.length} league(s), ${outgoing.length} email(s) to send, ${optedOut} opted out, ${pushes.length} push(es).` +
       (baselineDate ? ` Week since ${baselineDate}.` : " First recap (no baseline yet)."),
   );
 
@@ -173,6 +190,7 @@ async function main() {
         await writeFile(join(PREVIEW_DIR, file), renderHtml(o.recap));
       }
     }
+    for (const p of pushes) console.log(`  would push to ${p.message.user_id}'s devices: ${p.message.body}`);
     console.log(`DRY_RUN=1, nothing sent.${PREVIEW_DIR ? ` Previews in ${PREVIEW_DIR}.` : ""}`);
     return;
   }
@@ -211,10 +229,40 @@ async function main() {
     }
   }
   mailer.close();
+  if (!TEST_TO) await sendPushes(db, pushes);
   // Keep going past individual failures, but fail the run so the workflow emails you.
   // Re-running the same day only retries the ones that failed.
   if (failures.length) throw new Error(`${failures.length} of ${pending.length} email(s) failed.`);
   console.log(`Sent ${pending.length} email(s).`);
+}
+
+/**
+ * Hands the pushes not already sent today to the send-push function, in batches. A push that
+ * fails on one device isn't retried (the function reports it); a batch that fails outright is.
+ */
+async function sendPushes(db: SupabaseClient, pushes: { key: string; message: PushMessage }[]) {
+  const secret = process.env.PUSH_SECRET;
+  if (!secret) {
+    console.log("PUSH_SECRET not set; skipping push notifications.");
+    return;
+  }
+  const { data, error } = await db.from("recap_sends").select("key").in("key", pushes.map((p) => p.key));
+  if (error) throw error;
+  const done = new Set((data as { key: string }[]).map((r) => r.key));
+  const pending = pushes.filter((p) => !done.has(p.key));
+  const url = `${requireEnv("SUPABASE_URL").replace(/\/$/, "")}/functions/v1/send-push`;
+  for (let i = 0; i < pending.length; i += 100) {
+    const batch = pending.slice(i, i + 100);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-push-secret": secret },
+      body: JSON.stringify({ messages: batch.map((p) => p.message) }),
+    });
+    if (!res.ok) throw new Error(`send-push failed: ${res.status} ${await res.text()}`);
+    const { error: logError } = await db.from("recap_sends").insert(batch.map((p) => ({ key: p.key })));
+    if (logError) console.error(`  pushed but couldn't record it: ${logError.message}`);
+    console.log(`  pushes: ${JSON.stringify(await res.json())}`);
+  }
 }
 
 /** auth.users emails, keyed by user id. Covers Google and email-link sign-ins alike. */

@@ -1,0 +1,51 @@
+# Deploys the send-push Edge Function, sets its secrets, and tells the database where it
+# lives (private.push_config), so on-the-clock notifications start flowing. Runs on changes to
+# the function, or by hand from the Actions tab after changing a key. Needs the push migration applied.
+#
+# Repository variables: SUPABASE_URL, SUPABASE_PROJECT_REF, VAPID_PUBLIC_KEY, VAPID_SUBJECT
+# Repository secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_URL, VAPID_PRIVATE_KEY, PUSH_SECRET
+name: Push notifications
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/functions/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Set function secrets
+        run: |
+          npx --yes supabase@2 secrets set --project-ref "$PROJECT_REF" \
+            VAPID_PUBLIC_KEY="$VAPID_PUBLIC_KEY" VAPID_PRIVATE_KEY="$VAPID_PRIVATE_KEY" \
+            VAPID_SUBJECT="$VAPID_SUBJECT" PUSH_SECRET="$PUSH_SECRET"
+        env:
+          VAPID_PUBLIC_KEY: ${{ vars.VAPID_PUBLIC_KEY }}
+          VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
+      - name: Deploy send-push
+        run: npx --yes supabase@2 functions deploy send-push --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+      - name: Point the database at it
+        # psql variables (:'url') quote the values, so no SQL is built by string pasting.
+        run: |
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -v url="${SUPABASE_URL%/}" -v secret="$PUSH_SECRET" <<'SQL'
+          insert into private.push_config (project_url, secret) values (:'url', :'secret')
+          on conflict (id) do update set project_url = excluded.project_url, secret = excluded.secret;
+          SQL
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          PUSH_SECRET: ${{ secrets.PUSH_SECRET }}

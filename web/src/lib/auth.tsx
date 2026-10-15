@@ -1,6 +1,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { disablePush } from "./push";
 import { rows, supabase } from "./supabase";
 import type { Profile } from "./types";
 
@@ -16,6 +17,12 @@ const AuthContext = createContext<Auth>({ session: null, loading: true, profile:
 
 export function useAuth() {
   return useContext(AuthContext);
+}
+
+/** Signs out, first stopping this device's notifications so the next person here doesn't get yours. */
+export async function signOut() {
+  await disablePush().catch((err) => console.warn("Couldn't remove this device's notifications", err));
+  await supabase.auth.signOut();
 }
 
 /** The signed-in user's id. Only call below the auth gate. */

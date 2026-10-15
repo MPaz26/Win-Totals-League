@@ -1,5 +1,6 @@
-# Daily standings refresh from ESPN. Also runnable by hand from the Actions tab.
-# A failed run leaves the last good standings in place and GitHub emails you.
+# Daily standings refresh from ESPN, then League Pass games (scores for the last few days).
+# Also runnable by hand from the Actions tab; pick games_mode "season" once per season to
+# load the whole schedule. A failed run leaves the last good data in place and GitHub emails you.
 #
 # Repository variable: SUPABASE_URL (and optionally NBA_SEASON, default 2027)
 # Repository secret:   SUPABASE_SERVICE_ROLE_KEY
@@ -12,6 +13,12 @@ on:
   schedule:
     - cron: "0 11 * * *" # 11:00 UTC ≈ 6-7am ET, after every game has finished
   workflow_dispatch:
+    inputs:
+      games_mode:
+        description: "Games: recent (last 3 days) or season (load the whole schedule)"
+        type: choice
+        options: [recent, season]
+        default: recent
 
 permissions:
   contents: read
@@ -35,3 +42,10 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NBA_SEASON: ${{ vars.NBA_SEASON || '2027' }}
+      - run: npm run update-games
+        if: ${{ !cancelled() }} # scores still update if the standings step failed
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NBA_SEASON: ${{ vars.NBA_SEASON || '2027' }}
+          MODE: ${{ inputs.games_mode || 'recent' }}

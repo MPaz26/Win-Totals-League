@@ -12,7 +12,7 @@
 //   ALLOW_WIN_DECREASE=1  accept a team's wins going down (ESPN correction)
 
 import { createClient } from "@supabase/supabase-js";
-import { nbaDate, requireEnv } from "./lib.ts";
+import { fetchJson, nbaDate, requireEnv } from "./lib.ts";
 
 const SEASON = Number(process.env.NBA_SEASON ?? "2027");
 const DRY_RUN = process.env.DRY_RUN === "1";
@@ -40,19 +40,6 @@ interface EspnStandings {
       }[];
     };
   }[];
-}
-
-async function fetchJson(url: string, attempts = 3): Promise<unknown> {
-  for (let i = 1; ; i++) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      if (i >= attempts) throw new Error(`ESPN fetch failed after ${attempts} tries: ${String(err)}`);
-      await new Promise((r) => setTimeout(r, 2_000 * i));
-    }
-  }
 }
 
 function parse(data: EspnStandings): Standing[] {

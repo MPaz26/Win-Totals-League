@@ -1,14 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Badge, Button, Card, ErrorMessage, Field, InlineEdit, inputClass, LeagueMark, PageSpinner, statusBadge, Toggle } from "../components/ui";
-import { useAuth, useUserId } from "../lib/auth";
+import { TeamLogo } from "../components/team";
+import { Badge, Button, Card, ErrorMessage, Field, inputClass, LeagueMark, PageSpinner, statusBadge, Toggle } from "../components/ui";
+import { useUserId } from "../lib/auth";
 import { PICK_TIMER_OPTIONS } from "../lib/draft";
 import { useNotice } from "../lib/notice";
-import { useMyLeagues, useMyStandings, useWeeklyRecap } from "../lib/queries";
-import { rpc, supabase } from "../lib/supabase";
+import { TIERS, etToday, tipoffTime } from "../lib/leaguePass";
+import { useLpRankings, useLpSuggestions, useMyLeagues, useMyStandings, useTeams } from "../lib/queries";
+import { rpc } from "../lib/supabase";
 import type { OrderMode } from "../lib/types";
-import { USERNAME } from "./ProfileSetup";
 
 function ordinal(n: number) {
   const s = ["th", "st", "nd", "rd"];
@@ -70,11 +71,48 @@ export function Home() {
           </ul>
         )}
       </div>
-      <div className="space-y-6 self-start lg:mt-12">
+      <div className="space-y-4 self-start sm:space-y-6 lg:mt-12">
+        <TonightsBest />
         <CreateLeague />
-        <AccountSettings />
       </div>
     </div>
+  );
+}
+
+/** League Pass teaser: the best game still to tip tonight, or a nudge to rank teams. */
+function TonightsBest() {
+  const userId = useUserId();
+  const rankings = useLpRankings(userId);
+  const games = useLpSuggestions(etToday());
+  const teams = useTeams();
+  if (rankings.isPending || games.isPending || teams.isPending) return null;
+
+  const best = games.data?.find((g) => g.status === "scheduled" && Date.parse(g.tipoff) > Date.now());
+  const team = (id: number) => teams.data?.find((t) => t.id === id);
+  const home = best && team(best.home_team_id);
+  const away = best && team(best.away_team_id);
+
+  return (
+    <Card title="League Pass tonight" actions={<Link to="/watch" className="text-xs font-bold text-mint">All games ›</Link>}>
+      {rankings.data === null ? (
+        <p className="text-sm text-mute">
+          <Link to="/watch/rankings" className="font-bold text-mint">Rank your teams</Link> and we'll pick what to watch each night.
+        </p>
+      ) : best && home && away ? (
+        <Link to="/watch" className="flex items-center gap-3">
+          <TeamLogo abbr={away.abbr} className="h-9 w-9" />
+          <span className="text-xs font-bold text-faint">@</span>
+          <TeamLogo abbr={home.abbr} className="h-9 w-9" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-bold">{away.abbr} @ {home.abbr}</span>
+            <span className="block text-xs text-mute">{tipoffTime(best.tipoff)} · {TIERS[best.tier].label}</span>
+          </span>
+          <span className="text-2xl font-extrabold text-mint tabular-nums">{best.watch_score}</span>
+        </Link>
+      ) : (
+        <p className="text-sm text-mute">No more games tonight.</p>
+      )}
+    </Card>
   );
 }
 
@@ -145,59 +183,6 @@ function CreateLeague() {
         </Button>
         <p className="text-center text-xs text-faint">You can change these settings in the lobby until the draft starts.</p>
       </form>
-    </Card>
-  );
-}
-
-function AccountSettings() {
-  const userId = useUserId();
-  const { profile } = useAuth();
-  const notify = useNotice();
-  const queryClient = useQueryClient();
-  const recap = useWeeklyRecap(userId);
-
-  const save = useMutation({
-    mutationFn: async (on: boolean) => {
-      const { error } = await supabase
-        .from("email_preferences")
-        .upsert({ user_id: userId, weekly_recap: on, updated_at: new Date().toISOString() });
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: (_, on) => {
-      queryClient.setQueryData(["emailPrefs", userId], on);
-      notify(on ? "Weekly recaps on." : "Weekly recaps off.");
-    },
-    onError: (err) => notify(err.message, "error"),
-  });
-
-  async function rename(username: string) {
-    const { error } = await supabase.from("profiles").update({ username }).eq("id", userId);
-    if (error?.code === "23505") throw new Error("That username is taken.");
-    if (error) throw new Error(error.message);
-    // Usernames show up in every league's members and standings.
-    for (const key of ["profile", "members", "scoreboard", "myScores"]) queryClient.invalidateQueries({ queryKey: [key] });
-    notify("Username updated.");
-  }
-
-  return (
-    <Card title="Account">
-      <div className="mb-4 border-b border-line/70 pb-4">
-        <div className="mb-1 text-xs font-bold uppercase tracking-wide text-mute">Username</div>
-        <div className="font-semibold">
-          <InlineEdit value={profile?.username ?? ""} label="username" maxLength={24}
-            validate={(v) => (USERNAME.test(v) ? null : "2–24 characters: letters, numbers, spaces, _ . -")} onSave={rename} />
-        </div>
-      </div>
-      <Toggle
-        checked={save.isPending ? save.variables : (recap.data ?? true)}
-        onChange={(on) => save.mutate(on)}
-        label={
-          <span>
-            <span className="block font-semibold">Weekly recap</span>
-            <span className="block text-xs text-mute">Standings and your teams' wins, every Monday during the season.</span>
-          </span>
-        }
-      />
     </Card>
   );
 }

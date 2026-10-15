@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Avatar, Button, Card, Field, inputClass } from "../components/ui";
-import { useUserId } from "../lib/auth";
+import { signOut, useUserId } from "../lib/auth";
 import { supabase } from "../lib/supabase";
 
 // Same rule as the profiles.username check constraint.
@@ -52,6 +52,9 @@ export function ProfileSetup() {
         {save.error && <p className="text-sm text-rose">{save.error.message}</p>}
         <Button type="submit" busy={save.isPending} disabled={!valid} className="w-full">
           Continue
+        </Button>
+        <Button variant="ghost" size="sm" className="w-full" onClick={signOut}>
+          Use a different account
         </Button>
       </form>
     </Card>

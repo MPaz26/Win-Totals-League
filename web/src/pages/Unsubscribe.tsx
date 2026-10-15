@@ -37,7 +37,7 @@ export function Unsubscribe() {
       )}
       <p className="mt-4 text-sm text-mute">
         You can turn recaps on or off any time from{" "}
-        <Link to="/" className="font-semibold text-mint hover:underline">your leagues page</Link>.
+        <Link to="/profile" className="font-semibold text-mint hover:underline">your profile</Link>.
       </p>
     </Card>
   );

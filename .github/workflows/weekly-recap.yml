@@ -1,8 +1,8 @@
-# Weekly recap email to every league member. Mondays, after the daily standings refresh.
+# Weekly recap email (and push notification) to every league member. Mondays, after the daily standings refresh.
 # Also runnable by hand from the Actions tab, optionally to a single test address.
 #
 # Repository variables: SUPABASE_URL, APP_URL, GMAIL_USER (and optionally NBA_SEASON, EMAIL_FROM_NAME)
-# Repository secrets:   SUPABASE_SERVICE_ROLE_KEY, GMAIL_APP_PASSWORD
+# Repository secrets:   SUPABASE_SERVICE_ROLE_KEY, GMAIL_APP_PASSWORD (and optionally PUSH_SECRET for pushes)
 name: Weekly recap
 
 on:
@@ -44,6 +44,7 @@ jobs:
           GMAIL_USER: ${{ vars.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           EMAIL_FROM_NAME: ${{ vars.EMAIL_FROM_NAME }}
+          PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
           TEST_TO: ${{ inputs.test_to }}
           FORCE: ${{ inputs.test_to && '1' || '' }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}

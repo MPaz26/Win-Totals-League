@@ -6,6 +6,7 @@ import { App } from "./App";
 import "./index.css";
 import { AuthProvider } from "./lib/auth";
 import { NoticeProvider } from "./lib/notice";
+import { registerServiceWorker } from "./lib/push";
 import { isConfigured } from "./lib/supabase";
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ if (!isConfigured) {
     </div>,
   );
 } else {
+  registerServiceWorker();
   root.render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>

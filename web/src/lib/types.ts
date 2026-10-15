@@ -77,3 +77,47 @@ export interface LeaguePreview {
   member_count: number;
   is_member: boolean;
 }
+
+// League Pass. Mirrors supabase/migrations/*_league_pass.sql.
+
+export type GameStatus = "scheduled" | "in_progress" | "final" | "postponed" | "canceled";
+export type WatchTier = "must" | "good" | "meh";
+
+/** One game from lp_suggestions(), scored for the caller. Parts are 0..1, leans -1..1. */
+export interface Suggestion {
+  game_id: string;
+  game_date: string;
+  tipoff: string;
+  status: GameStatus;
+  home_team_id: number;
+  away_team_id: number;
+  home_score: number | null;
+  away_score: number | null;
+  /** National broadcasters; those games are blacked out on League Pass. */
+  national_tv: string | null;
+  watch_score: number;
+  tier: WatchTier;
+  home_rank: number;
+  away_rank: number;
+  appeal: number;
+  closeness: number;
+  my_lean: number;
+  community_lean: number;
+  quality: number;
+  my_stars: number | null;
+}
+
+export interface CommunityRank {
+  team_id: number;
+  /** Null until someone has ranked their teams. */
+  avg_rank: number | null;
+  n_users: number;
+  avg_stars: number | null;
+  n_ratings: number;
+}
+
+export interface LpSettings {
+  hide_scores: boolean;
+  notify_daily: boolean;
+  notify_must_watch: boolean;
+}

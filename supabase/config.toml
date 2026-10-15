@@ -4,3 +4,8 @@ project_id = "nba-wins-league"
 [auth]
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173/**", "http://localhost:8080/**"]
+
+# Called by the database (pg_net) and the weekly job with a shared secret, and by signed-in
+# users for a test push; the function checks both itself.
+[functions.send-push]
+verify_jwt = false

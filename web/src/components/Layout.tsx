@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { supabase } from "../lib/supabase";
-import { Avatar, Button } from "./ui";
+import { InstallButton } from "./InstallGuide";
+import { Avatar } from "./ui";
 
 export function Layout({ children }: { children: ReactNode }) {
   const { session, profile } = useAuth();
@@ -12,27 +12,51 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-line/70 bg-night/85 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/" className="flex items-center gap-2.5">
-            <Logo />
-            <span className="text-[17px] font-extrabold tracking-tight">
-              Win Totals<span className="text-mint">.</span>
-            </span>
-          </Link>
-          {session && (
-            <div className="flex items-center gap-2">
-              <span className="hidden items-center gap-2 rounded-full bg-panel py-1 pr-3 pl-1 ring-1 ring-line sm:flex">
-                <Avatar name={name} className="h-7 w-7 text-[11px]" />
-                <span className="text-sm font-semibold">{name}</span>
+          <div className="flex min-w-0 items-center gap-3 sm:gap-5">
+            <Link to="/" className="flex items-center gap-2.5" aria-label="Win Totals home">
+              <Logo />
+              <span className="hidden text-[17px] font-extrabold tracking-tight sm:inline">
+                Win Totals<span className="text-mint">.</span>
               </span>
-              <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>
-                Sign out
-              </Button>
-            </div>
-          )}
+            </Link>
+            {session && (
+              <nav aria-label="Main" className="flex gap-1">
+                <NavItem to="/" end>Leagues</NavItem>
+                <NavItem to="/watch">League Pass</NavItem>
+              </nav>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <InstallButton variant="ghost" />
+            {session && (
+              <Link
+                to="/profile"
+                aria-label="Profile and settings"
+                className="flex items-center gap-2 rounded-full bg-panel p-1 ring-1 ring-line transition-colors hover:bg-raised sm:pr-3"
+              >
+                <Avatar name={name} className="h-7 w-7 text-[11px]" />
+                <span className="hidden text-sm font-semibold sm:inline">{name}</span>
+              </Link>
+            )}
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:py-8">{children}</main>
     </div>
+  );
+}
+
+function NavItem({ to, end, children }: { to: string; end?: boolean; children: ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] font-bold transition-colors ${isActive ? "bg-raised text-ink" : "text-mute hover:text-ink"}`
+      }
+    >
+      {children}
+    </NavLink>
   );
 }
 
