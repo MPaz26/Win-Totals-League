@@ -26,6 +26,8 @@ export interface Recap {
   leagueName: string;
   leagueUrl: string;
   unsubscribeUrl: string;
+  /** The web app's root URL (with trailing slash); team logos are served from there. */
+  appUrl: string;
   /** "Oct 20 – Oct 27", or null on the first recap of the season. */
   period: string | null;
   standings: RecapRow[];
@@ -58,8 +60,9 @@ export function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
 }
 
-function logo(abbr: string, size: number): string {
-  return `<img src="https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png" width="${size}" height="${size}" alt="${escapeHtml(abbr)}" style="display:block;border:0;width:${size}px;height:${size}px">`;
+/** The light-background copy the web app hosts (web/public/logos/light). */
+function logo(appUrl: string, abbr: string, size: number): string {
+  return `<img src="${appUrl}logos/light/${abbr.toLowerCase()}.png" width="${size}" height="${size}" alt="${escapeHtml(abbr)}" style="display:block;border:0;width:${size}px;height:${size}px">`;
 }
 
 function plus(n: number | null): string {
@@ -122,7 +125,7 @@ export function renderHtml(r: Recap): string {
   const teamRows = r.me.teams
     .map(
       (t) => `<tr>
-        <td style="padding:8px 8px 8px 16px;border-top:1px solid ${C.line};width:32px">${logo(t.abbr, 28)}</td>
+        <td style="padding:8px 8px 8px 16px;border-top:1px solid ${C.line};width:32px">${logo(r.appUrl, t.abbr, 28)}</td>
         <td style="padding:8px;border-top:1px solid ${C.line};color:${C.ink};font-weight:600">${escapeHtml(t.name)}</td>
         ${hasWeek ? `<td style="padding:8px;border-top:1px solid ${C.line};text-align:right;color:${C.mint};font-weight:700">${plus(t.weekWins)}</td>` : ""}
         <td style="padding:8px 16px 8px 8px;border-top:1px solid ${C.line};text-align:right;font-weight:700;color:${C.ink};white-space:nowrap">${t.wins}–${t.losses}</td>

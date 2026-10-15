@@ -147,6 +147,7 @@ async function main() {
       leagueName: league.name,
       leagueUrl: `${appUrl}league/${league.id}`,
       unsubscribeUrl: `${appUrl}unsubscribe/${tokens.get(me.userId)!.token}`,
+      appUrl,
       period,
       standings,
       me,

@@ -17,7 +17,10 @@ export function teamColor(abbr: string): string {
   return ACCENTS[abbr] ?? "#56627a";
 }
 
-/** ESPN's logo CDN, dark-background variant. */
+/**
+ * ESPN's dark-background logos, copied into web/public/logos at 128px so the app doesn't hotlink
+ * ESPN. sw.js serves them cache-first.
+ */
 export function TeamLogo({ abbr, className = "h-8 w-8" }: { abbr: string; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
@@ -29,7 +32,7 @@ export function TeamLogo({ abbr, className = "h-8 w-8" }: { abbr: string; classN
   }
   return (
     <img
-      src={`https://a.espncdn.com/i/teamlogos/nba/500-dark/${abbr.toLowerCase()}.png`}
+      src={`${import.meta.env.BASE_URL}logos/${abbr.toLowerCase()}.png`}
       alt=""
       loading="lazy"
       className={`shrink-0 object-contain ${className}`}
