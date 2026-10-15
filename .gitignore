@@ -8,3 +8,6 @@ dist/
 # Supabase CLI local state
 supabase/.temp/
 supabase/.branches/
+
+# make recap-dry output
+recap-preview/

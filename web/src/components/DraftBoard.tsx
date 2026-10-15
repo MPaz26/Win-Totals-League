@@ -1,7 +1,9 @@
-import { pickFor, TOTAL_TEAMS } from "../lib/draft";
+import { managerName, pickFor, TOTAL_TEAMS } from "../lib/draft";
 import type { League, Member, Pick, Team } from "../lib/types";
+import { teamColor, TeamLogo } from "./team";
+import { Avatar } from "./ui";
 
-/** Rounds down, members across, like a draft board on the wall. */
+/** Rounds down, members across, each pick tinted in its team's colors. */
 export function DraftBoard({ league, members, picks, teams, userId }: {
   league: League;
   members: Member[];
@@ -16,19 +18,22 @@ export function DraftBoard({ league, members, picks, teams, userId }: {
   const onClock = league.status === "drafting" ? league.current_pick : null;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-max border-separate border-spacing-1 text-xs">
+    <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <table className="w-full min-w-max border-separate border-spacing-1.5 text-xs">
         <thead>
           <tr>
-            <th className="w-8" />
+            <th className="sticky left-0 z-10 w-8 bg-panel" />
             {members.map((m) => (
-              <th
-                key={m.user_id}
-                className={`truncate rounded px-2 py-1.5 text-left font-semibold ${
-                  m.user_id === userId ? "bg-orange-100 text-orange-900" : "bg-zinc-100"
-                }`}
-              >
-                {m.profile.username}
+              <th key={m.user_id} className="min-w-28 px-1 pb-1 font-semibold">
+                <div className="flex flex-col items-center gap-1.5">
+                  <Avatar
+                    name={m.profile.username}
+                    className={`h-8 w-8 text-[11px] ${m.user_id === userId ? "ring-2 ring-mint ring-offset-2 ring-offset-panel" : ""}`}
+                  />
+                  <span className={`max-w-28 truncate ${m.user_id === userId ? "text-mint" : "text-mute"}`}>
+                    {managerName({ team_name: m.team_name, username: m.profile.username })}
+                  </span>
+                </div>
               </th>
             ))}
           </tr>
@@ -36,33 +41,47 @@ export function DraftBoard({ league, members, picks, teams, userId }: {
         <tbody>
           {Array.from({ length: rounds }, (_, round) => (
             <tr key={round}>
-              <td className="pr-1 text-right text-zinc-400">R{round + 1}</td>
+              <td className="sticky left-0 z-10 bg-panel pr-1 text-right text-[11px] font-bold text-faint">R{round + 1}</td>
               {members.map((m) => {
                 const number = pickFor(round, m.draft_slot, n, league.snake);
                 if (number === null) return <td key={m.user_id} />;
                 const pick = byNumber.get(number);
                 const team = pick && teams.get(pick.team_id);
                 const live = number === onClock;
+                const label = `${round + 1}.${String(number - round * n).padStart(2, "0")}`;
+
+                if (team) {
+                  const color = teamColor(team.abbr);
+                  return (
+                    <td
+                      key={m.user_id}
+                      className="h-16 rounded-lg px-2 py-1.5 align-top"
+                      style={{
+                        background: `linear-gradient(135deg, ${color}40, ${color}14)`,
+                        boxShadow: `inset 0 3px 0 ${color}`,
+                      }}
+                      title={pick.auto ? `${team.name} (autopick)` : team.name}
+                    >
+                      <div className="flex items-center justify-between text-[10px] font-semibold text-ink/60">
+                        <span>{label}</span>
+                        {pick.auto && <span className="rounded bg-night/50 px-1 uppercase">auto</span>}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <TeamLogo abbr={team.abbr} className="h-6 w-6" />
+                        <span className="text-sm font-extrabold">{team.abbr}</span>
+                      </div>
+                    </td>
+                  );
+                }
                 return (
                   <td
                     key={m.user_id}
-                    className={`h-11 min-w-24 rounded px-2 py-1 align-top ${
-                      live
-                        ? "animate-pulse bg-orange-50 ring-2 ring-orange-400"
-                        : team
-                          ? "bg-white ring-1 ring-zinc-200"
-                          : "bg-zinc-50 ring-1 ring-zinc-100"
+                    className={`h-16 rounded-lg px-2 py-1.5 align-top ${
+                      live ? "bg-gold/10 ring-2 ring-gold" : "bg-night/60 ring-1 ring-line/60"
                     }`}
                   >
-                    <div className="text-[10px] text-zinc-400">#{number}</div>
-                    {team ? (
-                      <div className="font-medium" title={pick.auto ? `${team.name} (autopick)` : team.name}>
-                        {team.abbr}
-                        {pick.auto && <span className="ml-1 text-[10px] font-normal text-zinc-400">auto</span>}
-                      </div>
-                    ) : live ? (
-                      <div className="font-medium text-orange-700">On the clock</div>
-                    ) : null}
+                    <div className="text-[10px] font-semibold text-faint">{label}</div>
+                    {live && <div className="mt-1.5 animate-pulse text-[11px] font-extrabold uppercase text-gold">On the clock</div>}
                   </td>
                 );
               })}

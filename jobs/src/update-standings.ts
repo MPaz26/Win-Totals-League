@@ -12,6 +12,7 @@
 //   ALLOW_WIN_DECREASE=1  accept a team's wins going down (ESPN correction)
 
 import { createClient } from "@supabase/supabase-js";
+import { nbaDate, requireEnv } from "./lib.ts";
 
 const SEASON = Number(process.env.NBA_SEASON ?? "2027");
 const DRY_RUN = process.env.DRY_RUN === "1";
@@ -82,17 +83,6 @@ function parse(data: EspnStandings): Standing[] {
     if (r.wins + r.losses > GAMES) throw new Error(`${r.abbr}: ${r.wins}-${r.losses} is more than ${GAMES} games`);
   }
   return rows.sort((a, b) => b.wins - a.wins || a.losses - b.losses);
-}
-
-// The NBA's calendar day, so a 1am-ET run doesn't file results under the wrong date.
-function nbaDate(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
-}
-
-function requireEnv(name: string): string {
-  const v = process.env[name];
-  if (!v) throw new Error(`${name} is not set`);
-  return v;
 }
 
 async function main() {

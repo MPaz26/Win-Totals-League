@@ -2,16 +2,21 @@
   "name": "nba-wins-league-jobs",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "update-standings": "node src/update-standings.ts",
+    "weekly-recap": "node src/weekly-recap.ts",
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.3"
+    "@supabase/supabase-js": "^2.117.3",
+    "nodemailer": "^10.1.1"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "@types/nodemailer": "^8.0.2",
     "typescript": "~5.9.3"
   }
 }

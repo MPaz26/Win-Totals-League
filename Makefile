@@ -4,7 +4,7 @@ PG_IMAGE   := postgres:17-alpine
 NODE_IMAGE := node:24-alpine
 TEST_DB    := nba-wins-league-test-db
 
-.PHONY: dev prod-preview check test-db standings standings-dry
+.PHONY: dev prod-preview check test-db standings standings-dry recap recap-dry recap-test
 
 dev:
 	docker compose -f compose.dev.yaml up --build web
@@ -40,3 +40,19 @@ standings:
 standings-dry:
 	docker build -q -t nba-wins-league-jobs jobs >/dev/null
 	docker run --rm -e DRY_RUN=1 nba-wins-league-jobs
+
+# Weekly recap emails, reading Supabase, GMAIL_USER, GMAIL_APP_PASSWORD and APP_URL from .env.
+recap:
+	docker build -q -t nba-wins-league-jobs jobs >/dev/null
+	docker run --rm --env-file .env nba-wins-league-jobs node src/weekly-recap.ts
+
+# Build the recaps without sending; each email's HTML lands in recap-preview/.
+recap-dry:
+	docker build -q -t nba-wins-league-jobs jobs >/dev/null
+	docker run --rm --env-file .env -e DRY_RUN=1 -e PREVIEW_DIR=/out -v "$(CURDIR)/recap-preview":/out nba-wins-league-jobs node src/weekly-recap.ts
+
+# Send one sample recap per league to TO=you@example.com (FORCE=1 so it works preseason or in a quiet week).
+recap-test:
+	@test -n "$(TO)" || (echo "usage: make recap-test TO=you@example.com" && exit 1)
+	docker build -q -t nba-wins-league-jobs jobs >/dev/null
+	docker run --rm --env-file .env -e TEST_TO="$(TO)" -e FORCE=1 nba-wins-league-jobs node src/weekly-recap.ts

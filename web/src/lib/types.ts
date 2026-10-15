@@ -44,6 +44,8 @@ export interface Member {
   user_id: string;
   draft_slot: number;
   joined_at: string;
+  /** The manager's own name for their team in this league; null shows the username. */
+  team_name: string | null;
   profile: { username: string };
 }
 
@@ -64,6 +66,7 @@ export interface ScoreRow {
   wins: number;
   losses: number;
   place: number;
+  team_name: string | null;
 }
 
 export interface LeaguePreview {

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { TEAM_ABBRS, TeamLogo } from "../components/team";
 import { Button, Card, Field, inputClass } from "../components/ui";
 import { supabase } from "../lib/supabase";
 
@@ -33,51 +34,66 @@ export function SignIn({ intro }: { intro?: string }) {
   }
 
   return (
-    <Card className="mx-auto max-w-md">
-      {sentTo ? (
-        <div className="space-y-3 text-sm">
-          <h1 className="text-lg font-semibold">Check your email</h1>
-          <p className="text-zinc-600">
-            We sent a sign-in link to <strong>{sentTo}</strong>. Open it on this device to continue.
-          </p>
-          <Button variant="ghost" size="sm" onClick={() => setSentTo(null)}>
-            Use a different email
-          </Button>
+    <>
+      {!intro && (
+        <div className="mx-auto mb-8 max-w-xl text-center">
+          <div className="mb-6 flex flex-wrap justify-center gap-2 opacity-80" aria-hidden>
+            {TEAM_ABBRS.map((abbr) => (
+              <TeamLogo key={abbr} abbr={abbr} className="h-7 w-7" />
+            ))}
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Draft teams. <span className="text-mint">Bank wins.</span>
+          </h1>
+          <p className="mt-2 text-mute">Snake-draft all 30 NBA teams with friends. Most regular-season wins takes the league.</p>
         </div>
-      ) : (
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <h1 className="text-lg font-semibold">Sign in</h1>
-            <p className="mt-1 text-sm text-zinc-600">
-              {intro ?? "Draft NBA teams with friends and win on their regular-season wins."} No password needed.
-            </p>
-          </div>
-          <Button variant="secondary" className="w-full" onClick={signInWithGoogle}>
-            <GoogleLogo />
-            Continue with Google
-          </Button>
-          <div className="flex items-center gap-3 text-xs text-zinc-400">
-            <span className="h-px flex-1 bg-zinc-200" />
-            or get a link by email
-            <span className="h-px flex-1 bg-zinc-200" />
-          </div>
-          <Field label="Email">
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              className={inputClass}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          {error && <p className="text-sm text-red-700">{error}</p>}
-          <Button type="submit" variant="secondary" busy={busy} className="w-full">
-            Email me a sign-in link
-          </Button>
-        </form>
       )}
-    </Card>
+      <Card className="mx-auto max-w-md">
+        {sentTo ? (
+          <div className="space-y-3 text-sm">
+            <h1 className="text-lg font-extrabold">Check your email</h1>
+            <p className="text-mute">
+              We sent a sign-in link to <strong className="text-ink">{sentTo}</strong>. Open it on this device to continue.
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => setSentTo(null)}>
+              Use a different email
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <h2 className="text-lg font-extrabold">Sign in</h2>
+              <p className="mt-1 text-sm text-mute">
+                {intro ?? "Welcome back."} No password needed.
+              </p>
+            </div>
+            <Button variant="secondary" className="w-full" onClick={signInWithGoogle}>
+              <GoogleLogo />
+              Continue with Google
+            </Button>
+            <div className="flex items-center gap-3 text-xs text-faint">
+              <span className="h-px flex-1 bg-line" />
+              or get a link by email
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <Field label="Email">
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                className={inputClass}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            {error && <p className="text-sm text-rose">{error}</p>}
+            <Button type="submit" busy={busy} className="w-full">
+              Email me a sign-in link
+            </Button>
+          </form>
+        )}
+      </Card>
+    </>
   );
 }
 

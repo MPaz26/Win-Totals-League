@@ -22,6 +22,19 @@ export function useStandings() {
   });
 }
 
+/** Whether the user gets the weekly recap email. No row yet means subscribed. */
+export function useWeeklyRecap(userId: string) {
+  return useQuery({
+    queryKey: ["emailPrefs", userId],
+    queryFn: async () => {
+      const row = await rows<{ weekly_recap: boolean } | null>(
+        supabase.from("email_preferences").select("weekly_recap").eq("user_id", userId).maybeSingle(),
+      );
+      return row?.weekly_recap ?? true;
+    },
+  });
+}
+
 export function useMyLeagues() {
   return useQuery({
     queryKey: ["myLeagues"],
@@ -57,7 +70,7 @@ export function useMembers(id: string) {
       rows<Member[]>(
         supabase
           .from("league_members")
-          .select("user_id, draft_slot, joined_at, profile:profiles(username)")
+          .select("user_id, draft_slot, joined_at, team_name, profile:profiles(username)")
           .eq("league_id", id)
           .order("draft_slot"),
       ),

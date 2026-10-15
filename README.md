@@ -4,7 +4,7 @@ Draft all 30 NBA teams among friends. Each owner's score is the combined regular
 
 - **web/**: React + Vite + Tailwind single-page app, hosted on GitHub Pages.
 - **supabase/**: Postgres schema, row-level security, and the draft RPCs. Clients never write tables directly; every change goes through a `SECURITY DEFINER` function that checks the caller and locks the league row.
-- **jobs/**: a daily job that pulls standings from ESPN into `team_standings`.
+- **jobs/**: a daily job that pulls standings from ESPN into `team_standings`, and a weekly recap email sent from a Gmail account.
 
 ## How a league works
 
@@ -31,16 +31,30 @@ You only need Docker locally.
 | `make test-db` | Run the migrations and the draft scenario (`supabase/tests/draft_test.sql`) on a throwaway Postgres |
 | `make standings-dry` | Fetch and validate ESPN standings without writing anything |
 | `make standings` | Refresh standings in the database from `.env` |
+| `make recap-dry` | Build the weekly recap emails without sending; HTML previews land in `recap-preview/` |
+| `make recap-test TO=you@example.com` | Send one sample recap per league to that address only |
+| `make recap` | Send the weekly recap to every opted-in member |
+
+### Weekly recap email
+
+Recaps go out over Gmail SMTP, so no domain is needed. Gmail allows about 500 recipients a day, plenty for a few leagues. Use an account dedicated to this, since its app password ends up in GitHub secrets.
+
+1. In that Google account, turn on 2-Step Verification (Security), then search the account settings for **App passwords** and create one.
+2. Put `GMAIL_USER`, `GMAIL_APP_PASSWORD` and `APP_URL` (your Pages URL) in `.env`.
+3. `make recap-dry` to check the output, then `make recap-test TO=you@example.com`.
+
+Members can turn recaps off from the home page, or with the unsubscribe link in each email (no sign-in needed). Re-running the job never double-sends: every email sent is logged in `recap_sends`, so a re-run only retries the failures.
 
 ## Deploying (GitHub)
 
-Three workflows live in `.github/workflows/`:
+Four workflows live in `.github/workflows/`:
 
 - **CI** checks every push and PR, and deploys `main` to GitHub Pages (Settings → Pages → Source: **GitHub Actions**).
 - **Standings** runs daily at 11:00 UTC. If it fails (ESPN is down, or the data looks wrong), nothing is written, so the scoreboard keeps the last good numbers.
+- **Weekly recap** emails every member of a drafted league on Mondays at 14:00 UTC: league standings, their teams, and wins gained since the snapshot a week earlier. It skips the preseason and weeks with no games. Run it by hand to send a test to one address, or as a dry run.
 - **Migrate database** applies new migrations; run it by hand from the Actions tab.
 
-In Settings → Secrets and variables → Actions, add **variables** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL` and **secrets** `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`. Free accounts can only use Pages on public repos; that's fine, since no secrets are in the code.
+In Settings → Secrets and variables → Actions, add **variables** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `APP_URL`, `GMAIL_USER` and **secrets** `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `GMAIL_APP_PASSWORD`. Free accounts can only use Pages on public repos; that's fine, since no secrets are in the code.
 
 If ESPN corrects a result and a team's win total goes down, the job refuses to write. Re-run it with `ALLOW_WIN_DECREASE=1`.
 

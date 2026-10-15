@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+/* Dark, Sleeper-style palette. Utilities: bg-night, bg-panel, text-mute, ring-line, bg-mint, ... */
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-night: #0b111c;
+  --color-panel: #141c2a;
+  --color-raised: #1c2637;
+  --color-hover: #233047;
+  --color-line: #263246;
+  --color-ink: #eef2f8;
+  --color-mute: #8592a8;
+  --color-faint: #56627a;
+  --color-mint: #16d9c0;
+  --color-mint-deep: #0fb5a0;
+  --color-gold: #ffc53d;
+  --color-rose: #ff5c7a;
+}
+
+:root {
+  color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  @apply bg-zinc-100 text-zinc-900 antialiased;
+  @apply bg-night text-ink antialiased;
+  background-image: radial-gradient(60rem 30rem at 50% -10rem, rgb(22 217 192 / 0.07), transparent);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgb(22 217 192 / 0.35);
 }

@@ -199,4 +199,65 @@ set role authenticated;
 select test.expect_error('select private.autopick_expired_leagues()', 'permission denied');
 reset role;
 
+\set QUIET off
+\echo '--- email preferences'
+\set QUIET on
+
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'a')::text, false);
+insert into public.email_preferences (user_id, weekly_recap) values (:'a', true)
+  on conflict (user_id) do update set user_id = excluded.user_id, weekly_recap = excluded.weekly_recap;
+select test.check((select weekly_recap from public.email_preferences), 'user can upsert own prefs');
+select test.expect_error(format('insert into public.email_preferences (user_id) values (%L)', :'b'), 'row-level security');
+select test.expect_error(format('update public.email_preferences set unsubscribe_token = gen_random_uuid() where user_id = %L', :'a'),
+                         'permission denied');
+select set_config('request.jwt.claims', json_build_object('sub', :'b')::text, false);
+select test.check((select count(*) = 0 from public.email_preferences), 'cannot read another user''s token');
+reset role;
+
+select unsubscribe_token as token from public.email_preferences where user_id = :'a' \gset
+set role anon;
+select test.check(public.unsubscribe_weekly_recap(:'token'), 'signed-out unsubscribe by token');
+select test.check(not public.unsubscribe_weekly_recap(gen_random_uuid()), 'unknown token is a no-op');
+reset role;
+select test.check((select not weekly_recap from public.email_preferences where user_id = :'a'), 'unsubscribe sticks');
+set role authenticated;
+select test.expect_error('select * from public.recap_sends', 'permission denied');
+reset role;
+
+\set QUIET off
+\echo '--- editable names'
+\set QUIET on
+
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'a')::text, false);
+select public.rename_league(:'league', '  Renamed League  ');
+select test.check((select name = 'Renamed League' from public.leagues where id = :'league'), 'commissioner renames after the draft, trimmed');
+select test.expect_error(format('select public.rename_league(%L, %L)', :'league', '   '), 'check constraint');
+select test.expect_error(format('select public.rename_league(%L, %L)', :'league', E'bad\tname'), 'check constraint');
+select set_config('request.jwt.claims', json_build_object('sub', :'b')::text, false);
+select test.expect_error(format('select public.rename_league(%L, %L)', :'league', 'Hijacked'), 'Only the commissioner');
+
+select public.set_team_name(:'league', '  Bob''s Ballers ');
+select test.check((select team_name = 'Bob''s Ballers' from public.league_scoreboard where league_id = :'league' and user_id = :'b'),
+                  'member sets own team name, trimmed, on the scoreboard');
+select test.check((select team_name is null from public.league_members where league_id = :'league' and user_id = :'a'),
+                  'only the caller''s row changes');
+select test.expect_error(format('select public.set_team_name(%L, %L)', :'league', repeat('x', 41)), 'check constraint');
+select public.set_team_name(:'league', '');
+select test.check((select team_name is null from public.league_members where league_id = :'league' and user_id = :'b'), 'blank clears it');
+select set_config('request.jwt.claims', json_build_object('sub', :'d')::text, false);
+select test.expect_error(format('select public.set_team_name(%L, %L)', :'league', 'Gatecrashers'), 'League not found');
+
+select set_config('request.jwt.claims', json_build_object('sub', :'b')::text, false);
+update public.profiles set username = 'Bobby' where id = :'b';
+select test.check((select username = 'Bobby' from public.profiles where id = :'b'), 'user renames self');
+update public.profiles set username = 'Pwned' where id = :'a';
+select test.check((select username = 'Alice' from public.profiles where id = :'a'), 'cannot rename someone else');
+select test.expect_error(format('update public.profiles set username = %L where id = %L', 'CARA', :'b'), 'duplicate key');
+select test.expect_error(format('update public.profiles set created_at = now() where id = %L', :'b'), 'permission denied');
+select test.check((select username = 'Bobby' and teams > 0 from public.league_scoreboard where league_id = :'league' and user_id = :'b'),
+                  'renamed user keeps their picks (joined by id, not name)');
+reset role;
+
 \echo 'ALL TESTS PASSED'

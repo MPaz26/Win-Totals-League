@@ -26,14 +26,15 @@ export function NoticeProvider({ children }: { children: ReactNode }) {
   return (
     <NoticeContext.Provider value={notify}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex max-w-sm flex-col gap-2" role="status">
+      <div className="fixed top-[calc(env(safe-area-inset-top)+4rem)] right-4 left-4 z-50 flex flex-col items-stretch gap-2 sm:top-auto sm:bottom-4 sm:left-auto sm:max-w-sm sm:items-end" role="status">
         {notices.map((n) => (
           <div
             key={n.id}
-            className={`rounded-lg px-4 py-3 text-sm shadow-lg ${
-              n.kind === "error" ? "bg-red-600 text-white" : "bg-zinc-900 text-white"
+            className={`flex items-center gap-2.5 rounded-xl bg-raised px-4 py-3 text-sm font-semibold text-ink shadow-xl shadow-black/40 ring-1 ${
+              n.kind === "error" ? "ring-rose/50" : "ring-mint/40"
             }`}
           >
+            <span className={`h-2 w-2 shrink-0 rounded-full ${n.kind === "error" ? "bg-rose" : "bg-mint"}`} />
             {n.text}
           </div>
         ))}

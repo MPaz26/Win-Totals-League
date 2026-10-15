@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Card, Field, inputClass } from "../../components/ui";
+import { Avatar, Button, Card, Field, inputClass, Toggle } from "../../components/ui";
 import { useUserId } from "../../lib/auth";
 import { PICK_TIMER_OPTIONS, rosterSizes, timerLabel } from "../../lib/draft";
 import { useNotice } from "../../lib/notice";
@@ -60,23 +60,29 @@ export function Lobby({ league, members }: LeagueData) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-      <div className="space-y-6">
+    <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[1fr_22rem]">
+      <div className="space-y-4 sm:space-y-6">
         <InviteCard code={league.invite_code} />
 
         <Card
-          title={`Members (${members.length})`}
-          actions={manual ? <span className="text-xs text-zinc-500">Draft order</span> : undefined}
+          flush
+          title={`Managers · ${members.length}`}
+          actions={manual ? <span className="text-xs font-semibold text-mute">Draft order</span> : undefined}
         >
-          <ol className="divide-y divide-zinc-100">
+          <ol className="divide-y divide-line/50 pb-2">
             {members.map((m, i) => (
-              <li key={m.user_id} className="flex items-center gap-3 py-2.5">
-                {manual && <span className="w-6 text-right text-sm tabular-nums text-zinc-400">{m.draft_slot}</span>}
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {m.profile.username}
-                  {m.user_id === userId && <span className="font-normal text-zinc-500"> (you)</span>}
+              <li key={m.user_id} className="flex items-center gap-2 px-4 py-3 sm:gap-3 sm:px-5">
+                {manual && <span className="w-5 text-right text-xs font-bold tabular-nums text-faint">{m.draft_slot}</span>}
+                <Avatar name={m.profile.username} className="h-8 w-8 text-xs sm:h-9 sm:w-9 sm:text-sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{m.team_name ?? m.profile.username}</span>
+                  {(m.team_name || m.user_id === league.commissioner_id || m.user_id === userId) && (
+                    <span className="block truncate text-xs text-mute">
+                      {[m.team_name && m.profile.username, m.user_id === league.commissioner_id && "Commissioner", m.user_id === userId && "You"]
+                        .filter(Boolean).join(" · ")}
+                    </span>
+                  )}
                 </span>
-                {m.user_id === league.commissioner_id && <Badge tone="orange">Commissioner</Badge>}
                 {isCommish && manual && (
                   <span className="flex">
                     <Button variant="ghost" size="sm" aria-label="Move up" disabled={i === 0 || reorder.isPending}
@@ -85,26 +91,30 @@ export function Lobby({ league, members }: LeagueData) {
                       disabled={i === members.length - 1 || reorder.isPending} onClick={() => move(i, 1)}>↓</Button>
                   </span>
                 )}
-                {isCommish && m.user_id !== userId && (
-                  <Button variant="ghost" size="sm" disabled={remove.isPending}
+                {isCommish && (
+                  // Your own row gets an invisible copy, so everyone's arrows line up.
+                  <Button variant="ghost" size="sm" disabled={remove.isPending} aria-label={`Remove ${m.profile.username}`}
+                    className={m.user_id === userId ? "invisible" : ""} tabIndex={m.user_id === userId ? -1 : undefined}
                     onClick={() => window.confirm(`Remove ${m.profile.username}?`) && remove.mutate(m.user_id)}>
-                    Remove
+                    <span className="sm:hidden" aria-hidden>✕</span>
+                    <span className="hidden sm:inline">Remove</span>
                   </Button>
                 )}
               </li>
             ))}
           </ol>
           {!manual && (
-            <p className="mt-3 text-xs text-zinc-500">The draft order is randomized when the commissioner starts the draft.</p>
+            <p className="border-t border-line/70 px-4 py-3 text-xs text-faint sm:px-5">The draft order is randomized when the commissioner starts the draft.</p>
           )}
         </Card>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {isCommish ? <SettingsForm key={settingsKey(league)} league={league} /> : <SettingsSummary league={league} />}
 
-        <Card>
-          <p className="text-sm text-zinc-600">
+        <Card className="bg-gradient-to-br from-panel to-raised">
+          <div className="text-xs font-extrabold uppercase tracking-[0.14em] text-mute">Draft day</div>
+          <p className="mt-2 text-sm text-ink/80">
             {members.length < 2
               ? "Waiting for at least one more member to join."
               : `30 teams across ${members.length} members: ${rosterSizes(members.length)}.`}
@@ -115,7 +125,7 @@ export function Lobby({ league, members }: LeagueData) {
             </Button>
           ) : (
             <>
-              <p className="mt-2 text-sm text-zinc-600">The commissioner will start the draft. This page updates live.</p>
+              <p className="mt-2 text-sm text-mute">The commissioner will start the draft. This page updates live.</p>
               <Button variant="danger" size="sm" className="mt-4" busy={remove.isPending}
                 onClick={() => window.confirm(`Leave ${league.name}?`) && remove.mutate(userId)}>
                 Leave league
@@ -145,9 +155,9 @@ function InviteCard({ code }: { code: string }) {
     <Card title="Invite friends">
       <div className="flex gap-2">
         <input readOnly value={link} className={`${inputClass} font-mono text-xs`} onFocus={(e) => e.target.select()} />
-        <Button variant="secondary" onClick={copy}>Copy</Button>
+        <Button onClick={copy}>Copy link</Button>
       </div>
-      <p className="mt-2 text-xs text-zinc-500">Anyone with this link can join until the draft starts.</p>
+      <p className="mt-2 text-xs text-faint">Anyone with this link can join until the draft starts.</p>
     </Card>
   );
 }
@@ -159,10 +169,10 @@ function settingsKey(l: League) {
 function SettingsSummary({ league }: { league: League }) {
   return (
     <Card title="Draft settings">
-      <dl className="space-y-2 text-sm">
-        <div className="flex justify-between"><dt className="text-zinc-500">Format</dt><dd>{league.snake ? "Snake" : "Same order every round"}</dd></div>
-        <div className="flex justify-between"><dt className="text-zinc-500">Order</dt><dd>{league.order_mode === "random" ? "Random" : "Set by commissioner"}</dd></div>
-        <div className="flex justify-between"><dt className="text-zinc-500">Pick timer</dt><dd>{timerLabel(league.pick_seconds)}</dd></div>
+      <dl className="space-y-3 text-sm">
+        <div className="flex justify-between"><dt className="text-mute">Format</dt><dd className="font-semibold">{league.snake ? "Snake" : "Same order every round"}</dd></div>
+        <div className="flex justify-between"><dt className="text-mute">Order</dt><dd className="font-semibold">{league.order_mode === "random" ? "Random" : "Set by commissioner"}</dd></div>
+        <div className="flex justify-between"><dt className="text-mute">Pick timer</dt><dd className="font-semibold">{timerLabel(league.pick_seconds)}</dd></div>
       </dl>
     </Card>
   );
@@ -212,10 +222,7 @@ function SettingsForm({ league }: { league: League }) {
             <option value="manual">Set manually (use the arrows)</option>
           </select>
         </Field>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={snake} onChange={(e) => setSnake(e.target.checked)} />
-          Snake draft
-        </label>
+        <Toggle checked={snake} onChange={setSnake} label="Snake draft" />
         <Button variant="secondary" className="w-full" disabled={!dirty} busy={save.isPending} onClick={() => save.mutate()}>
           Save settings
         </Button>

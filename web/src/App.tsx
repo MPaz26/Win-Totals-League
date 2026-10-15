@@ -8,6 +8,7 @@ import { Join } from "./pages/Join";
 import { League } from "./pages/League";
 import { ProfileSetup } from "./pages/ProfileSetup";
 import { SignIn } from "./pages/SignIn";
+import { Unsubscribe } from "./pages/Unsubscribe";
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
       <Routes>
         {/* The invite page handles sign-in and username setup itself, so it can show the league first. */}
         <Route path="/join/:code" element={<Join />} />
+        <Route path="/unsubscribe/:token" element={<Unsubscribe />} />
         <Route path="/" element={<Gate><Home /></Gate>} />
         <Route path="/league/:id" element={<Gate><League /></Gate>} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,5 +1,10 @@
 export const TOTAL_TEAMS = 30;
 
+/** How a manager shows up in a league: their team name if they've set one, else their username. */
+export function managerName(m: { team_name: string | null; username: string }): string {
+  return m.team_name ?? m.username;
+}
+
 /** Same rule as public.slot_for_pick: which 1-based draft slot owns overall pick `pick`. */
 export function slotForPick(pick: number, members: number, snake: boolean): number {
   const round = Math.floor((pick - 1) / members);

@@ -1,0 +1,49 @@
+# Weekly recap email to every league member. Mondays, after the daily standings refresh.
+# Also runnable by hand from the Actions tab, optionally to a single test address.
+#
+# Repository variables: SUPABASE_URL, APP_URL, GMAIL_USER (and optionally NBA_SEASON, EMAIL_FROM_NAME)
+# Repository secrets:   SUPABASE_SERVICE_ROLE_KEY, GMAIL_APP_PASSWORD
+name: Weekly recap
+
+on:
+  schedule:
+    - cron: "0 14 * * 1" # Mondays 14:00 UTC ≈ 9-10am ET, three hours after Standings
+  workflow_dispatch:
+    inputs:
+      test_to:
+        description: "Send one sample per league to this address instead of the members"
+        required: false
+      dry_run:
+        description: "Build the emails but don't send"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jobs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: jobs/package-lock.json
+      - run: npm ci --omit=dev --no-audit --no-fund
+      - run: npm run weekly-recap
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NBA_SEASON: ${{ vars.NBA_SEASON || '2027' }}
+          APP_URL: ${{ vars.APP_URL }}
+          GMAIL_USER: ${{ vars.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_FROM_NAME: ${{ vars.EMAIL_FROM_NAME }}
+          TEST_TO: ${{ inputs.test_to }}
+          FORCE: ${{ inputs.test_to && '1' || '' }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
