@@ -67,6 +67,30 @@ export function useLpSuggestions(date: string) {
   });
 }
 
+/** Games per (Eastern) day for one month ("YYYY-MM"), keyed by YYYY-MM-DD. Days without games are missing. */
+export function useGameCounts(month: string) {
+  return useQuery({
+    queryKey: ["gameCounts", month],
+    staleTime: 60 * 60_000,
+    queryFn: async () => {
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      // A month is a few hundred games at most, well under PostgREST's row cap.
+      const data = await rows<{ game_date: string }[]>(
+        supabase
+          .from("nba_games")
+          .select("game_date")
+          .gte("game_date", `${month}-01`)
+          .lte("game_date", `${month}-${String(last).padStart(2, "0")}`)
+          .not("status", "in", "(postponed,canceled)"),
+      );
+      const counts = new Map<string, number>();
+      for (const g of data) counts.set(g.game_date, (counts.get(g.game_date) ?? 0) + 1);
+      return counts;
+    },
+  });
+}
+
 export const LP_DEFAULTS: LpSettings = { hide_scores: true, notify_daily: true, notify_must_watch: true };
 
 /** No row yet means the defaults. */

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { GameCalendar } from "../../components/GameCalendar";
 import { GameCard } from "../../components/GameCard";
 import { Button, Card, ErrorMessage, PageSpinner } from "../../components/ui";
 import { useUserId } from "../../lib/auth";
@@ -18,6 +19,7 @@ export function Tonight() {
   const [params, setParams] = useSearchParams();
   const date = DATE.test(params.get("date") ?? "") ? params.get("date")! : today;
   const go = (d: string) => setParams(d === today ? {} : { date: d }, { replace: true });
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const teams = useTeams();
   const games = useLpSuggestions(date);
@@ -49,13 +51,38 @@ export function Tonight() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={() => go(addDays(date, -1))} aria-label="Previous day">‹ Prev</Button>
         <div className="text-center">
-          <h1 className="text-2xl font-extrabold tracking-tight">{dayLabel(date)}</h1>
-          {date !== today && (
-            <button type="button" className="text-xs font-bold text-mint" onClick={() => go(today)}>Back to tonight</button>
-          )}
+          <button
+            type="button"
+            onClick={() => setCalendarOpen((o) => !o)}
+            aria-expanded={calendarOpen}
+            aria-label="Choose a day from the calendar"
+            className="inline-flex items-center gap-2 rounded-full px-2 text-2xl font-extrabold tracking-tight hover:text-mint"
+          >
+            {dayLabel(date)}
+            <CalendarIcon className={`h-5 w-5 ${calendarOpen ? "text-mint" : "text-mute"}`} />
+          </button>
+          <div className="text-xs text-mute">
+            {games.data && `${games.data.length} ${games.data.length === 1 ? "game" : "games"}`}
+            {games.data && date !== today && " · "}
+            {date !== today && (
+              <button type="button" className="font-bold text-mint" onClick={() => go(today)}>Back to tonight</button>
+            )}
+          </div>
         </div>
         <Button variant="ghost" size="sm" onClick={() => go(addDays(date, 1))} aria-label="Next day">Next ›</Button>
       </div>
+
+      {calendarOpen && (
+        <div className="mb-4">
+          <GameCalendar
+            selected={date}
+            onPick={(d) => {
+              go(d);
+              setCalendarOpen(false);
+            }}
+          />
+        </div>
+      )}
 
       {rankings.data === null && (
         <Card className="mb-4">
@@ -101,5 +128,14 @@ export function Tonight() {
         </div>
       )}
     </div>
+  );
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} className={className} aria-hidden>
+      <rect x="3" y="4.5" width="14" height="12.5" rx="2.5" />
+      <path d="M3 8.5h14M7 2.5v4M13 2.5v4" strokeLinecap="round" />
+    </svg>
   );
 }
