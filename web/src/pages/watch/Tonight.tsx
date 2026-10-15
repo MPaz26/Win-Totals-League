@@ -7,7 +7,7 @@ import { Button, Card, ErrorMessage, PageSpinner } from "../../components/ui";
 import { useUserId } from "../../lib/auth";
 import { addDays, canRate, dayLabel, etToday } from "../../lib/leaguePass";
 import { useNotice } from "../../lib/notice";
-import { useLpRankings, useLpSettings, useLpSuggestions, useTeams } from "../../lib/queries";
+import { useCommentCounts, useLpRankings, useLpSettings, useLpSuggestions, useTeams } from "../../lib/queries";
 import { rpc } from "../../lib/supabase";
 import { WatchTabs } from "./WatchTabs";
 
@@ -24,6 +24,7 @@ export function Tonight() {
   const teams = useTeams();
   const games = useLpSuggestions(date);
   const lastNight = useLpSuggestions(addDays(today, -1));
+  const commentCounts = useCommentCounts(date);
   const rankings = useLpRankings(userId);
   const settings = useLpSettings(userId);
   const notify = useNotice();
@@ -123,6 +124,7 @@ export function Tonight() {
               hideScores={settings.data.hide_scores}
               rating={rate.isPending && rate.variables.game === g.game_id}
               onRate={(stars) => rate.mutate({ game: g.game_id, stars })}
+              comments={commentCounts.data?.get(g.game_id)}
             />
           ))}
         </div>

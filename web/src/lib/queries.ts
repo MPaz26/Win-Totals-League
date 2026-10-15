@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { rows, rpc, supabase } from "./supabase";
-import type { CommunityRank, League, LeaguePreview, LpSettings, Member, Pick, ScoreRow, Standing, Suggestion, Team } from "./types";
+import type { CommunityRank, Game, GameComment, League, LeaguePreview, LpSettings, Member, Pick, ScoreRow, Standing, Suggestion, Team } from "./types";
 
 // ESPN convention: 2027 = the 2026-27 season. Keep in step with NBA_SEASON in the standings job.
 export const SEASON = 2027;
@@ -91,7 +91,7 @@ export function useGameCounts(month: string) {
   });
 }
 
-export const LP_DEFAULTS: LpSettings = { hide_scores: true, notify_daily: true, notify_must_watch: true };
+export const LP_DEFAULTS: LpSettings = { hide_scores: true, notify_daily: true, notify_must_watch: true, notify_replies: true };
 
 /** No row yet means the defaults. */
 export function useLpSettings(userId: string) {
@@ -99,11 +99,71 @@ export function useLpSettings(userId: string) {
     queryKey: ["lpSettings", userId],
     queryFn: async () => {
       const row = await rows<LpSettings | null>(
-        supabase.from("lp_settings").select("hide_scores, notify_daily, notify_must_watch").eq("user_id", userId).maybeSingle(),
+        supabase.from("lp_settings").select("hide_scores, notify_daily, notify_must_watch, notify_replies").eq("user_id", userId).maybeSingle(),
       );
       return row ?? LP_DEFAULTS;
     },
   });
+}
+
+/** Comment counts for one (Eastern) day's games, keyed by game id. Games without comments are missing. */
+export function useCommentCounts(date: string) {
+  return useQuery({
+    queryKey: ["commentCounts", date],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const data = await rpc<{ game_id: string; n_comments: number }[]>("lp_comment_counts", { p_from: date, p_to: date });
+      return new Map(data.map((r) => [r.game_id, r.n_comments]));
+    },
+  });
+}
+
+export function useGame(id: string) {
+  return useQuery({
+    queryKey: ["game", id],
+    staleTime: 5 * 60_000,
+    queryFn: () => rows<Game | null>(supabase.from("nba_games").select("*").eq("id", id).maybeSingle()),
+  });
+}
+
+/** Every comment on a game, oldest first. */
+export function useGameComments(id: string) {
+  return useQuery({
+    queryKey: ["gameComments", id],
+    queryFn: () =>
+      rows<GameComment[]>(
+        supabase
+          .from("lp_game_comments")
+          .select("id, user_id, parent_id, body, created_at, author:profiles(username)")
+          .eq("game_id", id)
+          .order("created_at"),
+      ),
+  });
+}
+
+/** Refetches a game's comments whenever anyone posts or deletes one. */
+export function useGameCommentsRealtime(id: string) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ["gameComments", id] });
+      queryClient.invalidateQueries({ queryKey: ["commentCounts"] });
+    };
+    const channel = supabase
+      .channel(`game:${id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "lp_game_comments", filter: `game_id=eq.${id}` }, refresh)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "lp_game_comments", filter: `game_id=eq.${id}` }, refresh)
+      // Realtime can't filter DELETEs, so any deleted comment anywhere triggers a (cheap) refetch.
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "lp_game_comments" }, refresh)
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") refresh();
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, queryClient]);
 }
 
 export function useMyLeagues() {

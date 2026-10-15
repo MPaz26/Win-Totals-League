@@ -21,9 +21,10 @@ A separate tool, not tied to any league, under **League Pass** in the header:
 
 - **My rankings**: order all 30 teams by how much you want to watch them. Drag the handle (touch and keyboard work too) or use the ↑/↓/Top buttons, then save.
 - **Games**: each night's games, scored 0–100 for you and sorted best first, with the reasons behind each score. After a game ends (or 2.5 hours after tipoff), rate it 1–5 stars. Final scores are hidden behind a tap unless you turn that off on your profile.
+- **Game threads**: tap a game's comment button to talk about it. Anyone signed in can read, post and reply (one level of replies), and delete their own comments. Comments update live. If you hide scores, comments on a game that has started stay behind a tap too, since they can give the result away. A reply notifies the thread's starter and everyone else who has replied (turn it off on your profile); notifications leave out the reply's text if you hide scores and the game has started.
 - **Community**: everyone's average rank for each team, and the average rating of its games.
 
-The score (`private.lp_scores` in `supabase/migrations/20261018000000_league_pass.sql`) weighs how high you rank both teams (45%), how close together you rank them (10%), your recent ratings of their games (20%), everyone's ratings (10%), and how good and evenly matched their records are (15%). The weights are at the top of that function.
+The score (`private.lp_scores`, last redefined in `supabase/migrations/20261019000000_watch_score_rank_weight.sql`) weighs how high you rank both teams (75%), how close together you rank them (10%), and how good and evenly matched their records are (15%), then nudges it up or down by up to 10 points for your recent ratings of their games and 5 for everyone's. The weights are at the top of that function.
 
 If you've ranked your teams and turned on notifications, you get the night's best game at 21:00 UTC, and an alert about 30 minutes before any game you'd score 80+. Both can be turned off on your profile. They're sent by pg_cron (`20261018000100_league_pass_cron.sql`).
 

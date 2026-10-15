@@ -11,6 +11,7 @@ import { ProfileSetup } from "./pages/ProfileSetup";
 import { SignIn } from "./pages/SignIn";
 import { Unsubscribe } from "./pages/Unsubscribe";
 import { Community } from "./pages/watch/Community";
+import { GameThread } from "./pages/watch/GameThread";
 import { Rankings } from "./pages/watch/Rankings";
 import { Tonight } from "./pages/watch/Tonight";
 
@@ -27,6 +28,7 @@ export function App() {
         <Route path="/watch" element={<Gate><Tonight /></Gate>} />
         <Route path="/watch/rankings" element={<Gate><Rankings /></Gate>} />
         <Route path="/watch/community" element={<Gate><Community /></Gate>} />
+        <Route path="/watch/games/:id" element={<Gate><GameThread /></Gate>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

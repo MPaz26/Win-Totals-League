@@ -120,4 +120,31 @@ export interface LpSettings {
   hide_scores: boolean;
   notify_daily: boolean;
   notify_must_watch: boolean;
+  notify_replies: boolean;
+}
+
+// Game threads. Mirrors supabase/migrations/*_game_comments.sql.
+
+/** A row of nba_games, for the thread page's header. */
+export interface Game {
+  id: string;
+  game_date: string;
+  tipoff: string;
+  status: GameStatus;
+  home_team_id: number;
+  away_team_id: number;
+  home_score: number | null;
+  away_score: number | null;
+  national_tv: string | null;
+}
+
+export interface GameComment {
+  id: number;
+  user_id: string;
+  /** The thread's top comment; null for a top comment itself. */
+  parent_id: number | null;
+  /** Null once deleted (kept only while it has replies). */
+  body: string | null;
+  created_at: string;
+  author: { username: string };
 }

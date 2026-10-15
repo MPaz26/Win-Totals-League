@@ -1,16 +1,19 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { canRate, TIERS, tipoffTime, whyChips } from "../lib/leaguePass";
 import type { Suggestion, Team } from "../lib/types";
 import { StarRating } from "./StarRating";
 import { TeamLogo, teamColor } from "./team";
 
-export function GameCard({ game, teams, hideScores, onRate, rating }: {
+export function GameCard({ game, teams, hideScores, onRate, rating, comments = 0 }: {
   game: Suggestion;
   teams: Map<number, Team>;
   hideScores: boolean;
   onRate: (stars: number | null) => void;
   /** True while this game's rating is saving. */
   rating?: boolean;
+  /** How many comments the game's thread has. */
+  comments?: number;
 }) {
   const [revealed, setRevealed] = useState(false);
   const home = teams.get(game.home_team_id);
@@ -76,12 +79,30 @@ export function GameCard({ game, teams, hideScores, onRate, rating }: {
         )}
       </ul>
 
-      {canRate(game) && (
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line/70 pt-3">
-          <span className="text-xs font-bold text-mute">{game.my_stars ? "Your rating" : "How was it?"}</span>
-          <StarRating value={game.my_stars} onChange={onRate} disabled={rating} label={`Rate ${matchup}`} />
-        </div>
-      )}
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-line/70 pt-3">
+        <Link
+          to={`/watch/games/${game.game_id}`}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-mute hover:text-ink"
+          aria-label={`${comments ? `${comments} comments` : "Comment"} on ${matchup}`}
+        >
+          <ChatIcon className="h-4 w-4" />
+          {comments ? comments : "Comment"}
+        </Link>
+        {canRate(game) && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-mute">{game.my_stars ? "Your rating" : "How was it?"}</span>
+            <StarRating value={game.my_stars} onChange={onRate} disabled={rating} label={`Rate ${matchup}`} />
+          </div>
+        )}
+      </div>
     </article>
+  );
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} className={className} aria-hidden>
+      <path d="M4 4.5h12a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H9l-4 3v-3H4A1.5 1.5 0 0 1 2.5 13V6A1.5 1.5 0 0 1 4 4.5z" strokeLinejoin="round" />
+    </svg>
   );
 }

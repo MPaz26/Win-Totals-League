@@ -30,6 +30,21 @@ export function tipoffTime(tipoff: string): string {
   return new Date(tipoff).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+/** "just now", "5m", "3h", "2d", then a date. */
+export function timeAgo(at: string): string {
+  const mins = Math.floor((Date.now() - Date.parse(at)) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m`;
+  if (mins < 24 * 60) return `${Math.floor(mins / 60)}h`;
+  if (mins < 7 * 24 * 60) return `${Math.floor(mins / (24 * 60))}d`;
+  return new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Whether a game has started, so its comments may give the score away. */
+export function hasStarted(g: { status: string; tipoff: string }): boolean {
+  return g.status === "in_progress" || g.status === "final" || Date.now() > Date.parse(g.tipoff);
+}
+
 /** Matches rate_game(): final, or 2.5 hours after tipoff even before the morning load marks it final. */
 export function canRate(g: Suggestion): boolean {
   if (g.status === "final") return true;

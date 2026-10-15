@@ -164,6 +164,8 @@ const LP_TOGGLES: { key: keyof LpSettings; title: string; hint: string; on: stri
     on: "Daily pick on.", off: "Daily pick off." },
   { key: "notify_must_watch", title: "Must-watch alerts", hint: "About 30 minutes before a game you'd score 80 or higher.",
     on: "Must-watch alerts on.", off: "Must-watch alerts off." },
+  { key: "notify_replies", title: "Replies to your comments", hint: "When someone replies in a game thread you've posted in.",
+    on: "Reply notifications on.", off: "Reply notifications off." },
 ];
 
 function LeaguePass() {
@@ -201,7 +203,7 @@ function LeaguePass() {
             }
           />
         ))}
-        <p className="text-xs text-faint">Notifications need them turned on for this device above, and your teams ranked.</p>
+        <p className="text-xs text-faint">Notifications need them turned on for this device above. Game picks also need your teams ranked.</p>
       </div>
     </Card>
   );
