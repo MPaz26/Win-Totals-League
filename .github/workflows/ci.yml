@@ -1,0 +1,111 @@
+# Every push and PR: check web + jobs, run the database tests.
+# Pushes to main also deploy the web app to GitHub Pages
+# (Settings -> Pages -> Source must be "GitHub Actions").
+#
+# Repository variables (Settings -> Secrets and variables -> Actions -> Variables):
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY   public values, baked into the build
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+
+  jobs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jobs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: jobs/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+
+  # Same as `make test-db`: plain Postgres + the Supabase shim, pg_cron migration skipped.
+  db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: psql -v ON_ERROR_STOP=1 -q -f supabase/tests/supabase_shim.sql
+      - run: |
+          for f in supabase/migrations/*.sql; do
+            case "$f" in *cron*) ;; *) psql -v ON_ERROR_STOP=1 -q -f "$f";; esac
+          done
+      - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/draft_test.sql
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [web, jobs, db]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - id: pages
+        uses: actions/configure-pages@v5
+      - working-directory: web
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # Project sites live at /<repo>/; configure-pages reports the exact path.
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          # Pages has no SPA rewrite; serving the app as the 404 page makes deep links (/join/abc) work.
+          cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

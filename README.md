@@ -2,7 +2,7 @@
 
 Draft all 30 NBA teams among friends. Each owner's score is the combined regular-season wins of the teams they drafted.
 
-- **web/**: React + Vite + Tailwind single-page app, hosted on GitLab Pages.
+- **web/**: React + Vite + Tailwind single-page app, hosted on GitHub Pages.
 - **supabase/**: Postgres schema, row-level security, and the draft RPCs. Clients never write tables directly; every change goes through a `SECURITY DEFINER` function that checks the caller and locks the league row.
 - **jobs/**: a daily job that pulls standings from ESPN into `team_standings`.
 
@@ -18,8 +18,8 @@ Draft all 30 NBA teams among friends. Each owner's score is the combined regular
 
 You only need Docker locally.
 
-1. Create a Supabase project, then apply the migrations: `supabase db push`, or run the manual `migrate` job in CI.
-2. In Supabase → Authentication → URL Configuration, add your Pages URL (e.g. `https://group.gitlab.io/nba-wins-league/**`) to the redirect URLs. Without it, sign-in links send people back to the wrong place.
+1. Create a Supabase project, then apply the migrations: `supabase db push`, or run the **Migrate database** workflow from the Actions tab.
+2. In Supabase → Authentication → URL Configuration, set the Site URL to your Pages URL (e.g. `https://<user>.github.io/win-totals-league/`) and add it with `**` appended to the redirect URLs, along with `http://localhost:5173/**` for local dev. Without it, sign-in links send people back to the wrong place.
 3. Enable Google sign-in: create an OAuth client in Google Cloud (redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`), then paste its ID and secret into Supabase → Authentication → Sign In / Providers → Google.
 4. `cp .env.example .env` and fill it in.
 
@@ -32,9 +32,15 @@ You only need Docker locally.
 | `make standings-dry` | Fetch and validate ESPN standings without writing anything |
 | `make standings` | Refresh standings in the database from `.env` |
 
-## Deploying (GitLab)
+## Deploying (GitHub)
 
-`.gitlab-ci.yml` checks every push and deploys `main` to Pages. Set the CI/CD variables listed at the top of that file. Then add a **pipeline schedule** (Build → Pipeline schedules) to run once a day; scheduled pipelines run only the standings job. If it fails (ESPN is down, or the data looks wrong), nothing is written, so the scoreboard keeps the last good numbers.
+Three workflows live in `.github/workflows/`:
+
+- **CI** checks every push and PR, and deploys `main` to GitHub Pages (Settings → Pages → Source: **GitHub Actions**).
+- **Standings** runs daily at 11:00 UTC. If it fails (ESPN is down, or the data looks wrong), nothing is written, so the scoreboard keeps the last good numbers.
+- **Migrate database** applies new migrations; run it by hand from the Actions tab.
+
+In Settings → Secrets and variables → Actions, add **variables** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL` and **secrets** `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`. Free accounts can only use Pages on public repos; that's fine, since no secrets are in the code.
 
 If ESPN corrects a result and a team's win total goes down, the job refuses to write. Re-run it with `ALLOW_WIN_DECREASE=1`.
 

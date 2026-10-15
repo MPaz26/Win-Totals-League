@@ -1,0 +1,37 @@
+# Daily standings refresh from ESPN. Also runnable by hand from the Actions tab.
+# A failed run leaves the last good standings in place and GitHub emails you.
+#
+# Repository variable: SUPABASE_URL (and optionally NBA_SEASON, default 2027)
+# Repository secret:   SUPABASE_SERVICE_ROLE_KEY
+#
+# Note: GitHub disables scheduled workflows in public repos after 60 days without a
+# commit. If standings stop updating, re-enable it from the Actions tab.
+name: Standings
+
+on:
+  schedule:
+    - cron: "0 11 * * *" # 11:00 UTC ≈ 6-7am ET, after every game has finished
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jobs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: jobs/package-lock.json
+      - run: npm ci --omit=dev --no-audit --no-fund
+      - run: npm run update-standings
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NBA_SEASON: ${{ vars.NBA_SEASON || '2027' }}

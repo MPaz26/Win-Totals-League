@@ -16,7 +16,7 @@ ARG VITE_SUPABASE_ANON_KEY
 COPY . .
 RUN npm run build
 
-# Serves the same static build GitLab Pages does, for checking a production build locally.
+# Serves the same static build GitHub Pages does, for checking a production build locally.
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

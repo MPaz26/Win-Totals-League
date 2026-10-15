@@ -1,9 +1,9 @@
-// Daily standings refresh (GitLab scheduled pipeline, or `make standings`).
+// Daily standings refresh (scheduled GitHub Actions workflow, or `make standings`).
 //
 // Pulls regular-season W-L from ESPN, sanity-checks it, then upserts team_standings
 // (what the scoreboard reads) and a dated row in team_standings_history.
 // Any surprise exits non-zero without writing, so the scoreboard keeps the last
-// good numbers and the failed pipeline sends an email.
+// good numbers and the failed workflow run sends an email.
 //
 // Env:
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  required unless DRY_RUN=1
