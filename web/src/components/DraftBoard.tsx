@@ -1,4 +1,4 @@
-import { managerName, pickFor, TOTAL_TEAMS } from "../lib/draft";
+import { managerName, pickFor, totalPicks } from "../lib/draft";
 import type { League, Member, Pick, Team } from "../lib/types";
 import { teamColor, TeamLogo } from "./team";
 import { Avatar } from "./ui";
@@ -13,7 +13,7 @@ export function DraftBoard({ league, members, picks, teams, userId }: {
 }) {
   const n = members.length;
   if (n === 0) return null;
-  const rounds = Math.ceil(TOTAL_TEAMS / n);
+  const rounds = totalPicks(n) / n;
   const byNumber = new Map(picks.map((p) => [p.pick_number, p]));
   const onClock = league.status === "drafting" ? league.current_pick : null;
 
@@ -44,7 +44,6 @@ export function DraftBoard({ league, members, picks, teams, userId }: {
               <td className="sticky left-0 z-10 bg-panel pr-1 text-right text-[11px] font-bold text-faint">R{round + 1}</td>
               {members.map((m) => {
                 const number = pickFor(round, m.draft_slot, n, league.snake);
-                if (number === null) return <td key={m.user_id} />;
                 const pick = byNumber.get(number);
                 const team = pick && teams.get(pick.team_id);
                 const live = number === onClock;

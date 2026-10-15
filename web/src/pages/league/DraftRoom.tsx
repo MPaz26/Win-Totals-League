@@ -4,7 +4,7 @@ import { DraftBoard } from "../../components/DraftBoard";
 import { teamColor, TeamLogo } from "../../components/team";
 import { Avatar, Button, Card, inputClass, Segmented } from "../../components/ui";
 import { useUserId } from "../../lib/auth";
-import { formatCountdown, managerName, roundOf, slotForPick, TOTAL_TEAMS } from "../../lib/draft";
+import { formatCountdown, managerName, roundOf, slotForPick, TOTAL_TEAMS, totalPicks } from "../../lib/draft";
 import { useNotice } from "../../lib/notice";
 import { useServerOffset } from "../../lib/queries";
 import { rpc } from "../../lib/supabase";
@@ -98,7 +98,7 @@ export function DraftRoom({ league, members, picks, teams }: LeagueData) {
                   {myTurn ? "Make your pick" : ((onClock && names.get(onClock.user_id)) ?? "…")}
                 </div>
                 <div className={`mt-0.5 text-xs font-semibold ${myTurn ? "text-night/70" : "text-mute"}`}>
-                  Round {roundOf(league.current_pick, n)} · Pick {league.current_pick}<span className="hidden sm:inline"> of {TOTAL_TEAMS}</span>
+                  Round {roundOf(league.current_pick, n)} · Pick {league.current_pick}<span className="hidden sm:inline"> of {totalPicks(n)}</span>
                 </div>
               </div>
             </div>
@@ -116,7 +116,7 @@ export function DraftRoom({ league, members, picks, teams }: LeagueData) {
           <div className={`absolute inset-x-0 bottom-0 h-1 ${myTurn ? "bg-night/15" : "bg-night"}`}>
             <div
               className={`h-full transition-all ${myTurn ? "bg-night/50" : "bg-mint"}`}
-              style={{ width: `${((league.current_pick - 1) / TOTAL_TEAMS) * 100}%` }}
+              style={{ width: `${((league.current_pick - 1) / totalPicks(n)) * 100}%` }}
             />
           </div>
         </div>

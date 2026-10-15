@@ -1,5 +1,10 @@
 export const TOTAL_TEAMS = 30;
 
+/** Same rule as private.total_picks: only full rounds, so every roster is the same size. */
+export function totalPicks(members: number): number {
+  return members < 1 ? 0 : Math.floor(TOTAL_TEAMS / members) * members;
+}
+
 /** How a manager shows up in a league: their team name if they've set one, else their username. */
 export function managerName(m: { team_name: string | null; username: string }): string {
   return m.team_name ?? m.username;
@@ -12,24 +17,22 @@ export function slotForPick(pick: number, members: number, snake: boolean): numb
   return snake && round % 2 === 1 ? members - pos : pos + 1;
 }
 
-/** Inverse of slotForPick: the overall pick number for a slot in a 0-based round, or null past pick 30. */
-export function pickFor(round: number, slot: number, members: number, snake: boolean): number | null {
+/** Inverse of slotForPick: the overall pick number for a slot in a 0-based round. */
+export function pickFor(round: number, slot: number, members: number, snake: boolean): number {
   const pos = snake && round % 2 === 1 ? members - slot : slot - 1;
-  const pick = round * members + pos + 1;
-  return pick <= TOTAL_TEAMS ? pick : null;
+  return round * members + pos + 1;
 }
 
 export function roundOf(pick: number, members: number): number {
   return Math.floor((pick - 1) / members) + 1;
 }
 
-/** "8 teams each" or "8 teams for 2, 7 for the other 2". */
+/** "10 teams each" or "7 teams each, 2 left undrafted". */
 export function rosterSizes(members: number): string {
   if (members < 1) return "";
-  const base = Math.floor(TOTAL_TEAMS / members);
-  const extra = TOTAL_TEAMS % members;
-  if (extra === 0) return `${base} teams each`;
-  return `${base + 1} teams for the first ${extra} in the order, ${base} for the other ${members - extra}`;
+  const leftover = TOTAL_TEAMS - totalPicks(members);
+  const each = `${totalPicks(members) / members} teams each`;
+  return leftover === 0 ? each : `${each}, ${leftover} left undrafted`;
 }
 
 export const PICK_TIMER_OPTIONS = [

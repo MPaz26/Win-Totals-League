@@ -133,7 +133,7 @@ end $$;
 set role authenticated;
 
 select test.check((select status = 'complete' and pick_deadline is null from public.leagues where id = :'league'),
-                  'draft completes after 30 picks');
+                  'draft completes after 30 picks (3 members, nothing left over)');
 reset role;
 -- Picks 6 and 7 are both Cara's; pick 6 was an autopick, so she isn't watching and still gets told.
 select test.check((select count(*) = 1 from net.test_requests where body->'messages'->0->>'body' like 'Test League: pick 7,%'),
@@ -196,11 +196,82 @@ begin
     perform public.make_pick(v_league, v_team);
   end loop;
 end $$;
-select test.check((select array_agg(teams order by teams) = array[7, 7, 8, 8]
-                     from public.league_scoreboard where league_id = :'four'), '30 teams / 4 = 8,8,7,7');
+select test.check((select array_agg(teams order by teams) = array[7, 7, 7, 7]
+                     from public.league_scoreboard where league_id = :'four'), '4 members get 7 each');
+select test.check((select status = 'complete' and current_pick = 29 and completed_at is not null
+                     from public.leagues where id = :'four'), 'draft completes after 28 picks');
+select test.check((select array_agg(t.id order by t.id) = array[29, 30]::smallint[]
+                     from public.nba_teams t
+                    where not exists (select 1 from public.draft_picks p where p.league_id = :'four' and p.team_id = t.id)),
+                  'the 2 leftover teams go undrafted');
 select test.check((select array_agg(m.draft_slot order by p.pick_number) = array[1,2,3,4,1,2,3,4]::smallint[]
                      from public.draft_picks p join public.league_members m using (league_id, user_id)
                     where p.league_id = :'four' and p.pick_number <= 8), 'linear order repeats 1..4');
+select test.expect_error(format('insert into public.draft_picks values (%L, 29, %L, 29)', :'four', :'a'),
+                         'Every pick in this draft has been made');
+select test.check((select count(*) = 28 from public.draft_picks where league_id = :'four'), 'no pick lands past the last full round');
+
+\set QUIET off
+\echo '--- leftover picks backfill'
+\set QUIET on
+
+-- Recreates drafts from before even rosters: one finished with all 30 teams, one still drafting
+-- on a leftover pick, and a 3-member one that was already even.
+do $$
+declare
+  v_done  uuid;
+  v_stuck uuid;
+  v_even  uuid;
+  v_users uuid[] := array['00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b',
+                          '00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-00000000000d'];
+begin
+  alter table public.draft_picks disable trigger draft_picks_in_draft;
+
+  insert into public.leagues (name, commissioner_id, status, current_pick, completed_at)
+  values ('Legacy done', v_users[1], 'complete', 31, now()) returning id into v_done;
+  insert into public.leagues (name, commissioner_id, status, current_pick, pick_deadline)
+  values ('Legacy stuck', v_users[1], 'drafting', 29, now() + interval '1 hour') returning id into v_stuck;
+  insert into public.leagues (name, commissioner_id, status, current_pick, completed_at)
+  values ('Legacy even', v_users[1], 'complete', 31, '2026-10-01') returning id into v_even;
+
+  insert into public.league_members (league_id, user_id, draft_slot)
+  select l, v_users[s], s
+    from unnest(array[v_done, v_stuck]) l, generate_series(1, 4) s
+  union all
+  select v_even, v_users[s], s from generate_series(1, 3) s;
+
+  -- Linear order; pick n takes team n, made n minutes after the start.
+  insert into public.draft_picks (league_id, pick_number, user_id, team_id, picked_at)
+  select v_done, n, v_users[(n - 1) % 4 + 1], n, '2026-10-01'::timestamptz + make_interval(mins => n)
+    from generate_series(1, 30) n
+  union all
+  select v_stuck, n, v_users[(n - 1) % 4 + 1], n, '2026-10-01'::timestamptz + make_interval(mins => n)
+    from generate_series(1, 28) n
+  union all
+  select v_even, n, v_users[(n - 1) % 3 + 1], n, '2026-10-01'::timestamptz + make_interval(mins => n)
+    from generate_series(1, 30) n;
+
+  alter table public.draft_picks enable trigger draft_picks_in_draft;
+
+  perform private.trim_leftover_picks();
+  perform private.trim_leftover_picks();  -- idempotent
+end $$;
+
+select test.check((select count(*) = 28 and max(pick_number) = 28 and not bool_or(team_id in (29, 30))
+                     from public.draft_picks p join public.leagues l on l.id = p.league_id
+                    where l.name = 'Legacy done'), 'backfill drops picks 29 and 30');
+select test.check((select status = 'complete' and current_pick = 29
+                          and completed_at = '2026-10-01'::timestamptz + interval '28 minutes'
+                     from public.leagues where name = 'Legacy done'), 'finished draft ends at pick 28');
+select test.check((select status = 'complete' and current_pick = 29 and pick_deadline is null
+                          and completed_at = '2026-10-01'::timestamptz + interval '28 minutes'
+                     from public.leagues where name = 'Legacy stuck'), 'draft stuck on a leftover pick is closed out');
+select test.check((select count(*) = 28 from public.draft_picks p join public.leagues l on l.id = p.league_id
+                    where l.name = 'Legacy stuck'), 'stuck draft keeps its 28 real picks');
+select test.check((select count(*) = 30 from public.draft_picks p join public.leagues l on l.id = p.league_id
+                    where l.name = 'Legacy even'), 'even draft keeps all 30 picks');
+select test.check((select current_pick = 31 and completed_at = '2026-10-01'
+                     from public.leagues where name = 'Legacy even'), 'even draft is untouched');
 
 \set QUIET off
 \echo '--- privileges'
