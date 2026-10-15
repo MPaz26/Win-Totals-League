@@ -43,6 +43,12 @@ export function Tonight() {
     onError: (err) => notify(err.message, "error"),
   });
 
+  // The favorite team's game goes first; the rest keep their best-first order.
+  const favorite = settings.data?.favorite_team_id;
+  const isFavorite = (g: { home_team_id: number; away_team_id: number }) =>
+    favorite != null && (g.home_team_id === favorite || g.away_team_id === favorite);
+  const list = [...(games.data ?? [])].sort((a, b) => Number(isFavorite(b)) - Number(isFavorite(a)));
+
   const unrated = date === today ? (lastNight.data ?? []).filter((g) => canRate(g) && !g.my_stars).length : 0;
 
   return (
@@ -116,10 +122,11 @@ export function Tonight() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {games.data.map((g) => (
+          {list.map((g) => (
             <GameCard
               key={g.game_id}
               game={g}
+              favorite={isFavorite(g)}
               teams={teamMap}
               hideScores={settings.data.hide_scores}
               rating={rate.isPending && rate.variables.game === g.game_id}

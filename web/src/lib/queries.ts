@@ -91,7 +91,7 @@ export function useGameCounts(month: string) {
   });
 }
 
-export const LP_DEFAULTS: LpSettings = { hide_scores: true, notify_daily: true, notify_must_watch: true, notify_replies: true };
+export const LP_DEFAULTS: LpSettings = { hide_scores: true, notify_daily: true, notify_must_watch: true, notify_replies: true, favorite_team_id: null };
 
 /** No row yet means the defaults. */
 export function useLpSettings(userId: string) {
@@ -99,7 +99,7 @@ export function useLpSettings(userId: string) {
     queryKey: ["lpSettings", userId],
     queryFn: async () => {
       const row = await rows<LpSettings | null>(
-        supabase.from("lp_settings").select("hide_scores, notify_daily, notify_must_watch, notify_replies").eq("user_id", userId).maybeSingle(),
+        supabase.from("lp_settings").select("hide_scores, notify_daily, notify_must_watch, notify_replies, favorite_team_id").eq("user_id", userId).maybeSingle(),
       );
       return row ?? LP_DEFAULTS;
     },

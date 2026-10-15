@@ -121,6 +121,8 @@ export interface LpSettings {
   notify_daily: boolean;
   notify_must_watch: boolean;
   notify_replies: boolean;
+  /** Pinned to the top of the games list; null for none. */
+  favorite_team_id: number | null;
 }
 
 // Game threads. Mirrors supabase/migrations/*_game_comments.sql.

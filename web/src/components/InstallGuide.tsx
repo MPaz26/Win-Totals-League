@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { isIos, isStandalone } from "../lib/push";
 import { Button } from "./ui";
 
@@ -68,7 +69,9 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
     onClose();
   }
 
-  return (
+  // Portal to <body>: the header's backdrop-blur makes it the containing block for
+  // fixed descendants, which would trap the overlay inside the header.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
         role="dialog"
@@ -111,7 +114,8 @@ function InstallGuide({ onClose }: { onClose: () => void }) {
 
         <Button variant="ghost" className="mt-3 w-full" onClick={onClose}>Close</Button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

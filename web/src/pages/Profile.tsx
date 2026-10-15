@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InstallButton } from "../components/InstallGuide";
-import { Avatar, Button, Card, InlineEdit, Spinner, Toggle } from "../components/ui";
+import { Avatar, Button, Card, Field, InlineEdit, inputClass, Spinner, Toggle } from "../components/ui";
 import { signOut, useAuth, useUserId } from "../lib/auth";
 import { useNotice } from "../lib/notice";
 import { disablePush, enablePush, isDeviceSubscribed, pushSupport, sendTestPush } from "../lib/push";
-import { LP_DEFAULTS, useLpSettings, useWeeklyRecap } from "../lib/queries";
+import { LP_DEFAULTS, useLpSettings, useTeams, useWeeklyRecap } from "../lib/queries";
 import type { LpSettings } from "../lib/types";
 import { supabase } from "../lib/supabase";
 import { USERNAME } from "./ProfileSetup";
@@ -157,7 +157,7 @@ function Email() {
   );
 }
 
-const LP_TOGGLES: { key: keyof LpSettings; title: string; hint: string; on: string; off: string }[] = [
+const LP_TOGGLES: { key: Exclude<keyof LpSettings, "favorite_team_id">; title: string; hint: string; on: string; off: string }[] = [
   { key: "hide_scores", title: "Hide final scores", hint: "Tap to reveal, so a game you're watching later isn't spoiled.",
     on: "Scores hidden.", off: "Scores shown." },
   { key: "notify_daily", title: "Tonight's best game", hint: "A notification each afternoon with your top game.",
@@ -173,6 +173,7 @@ function LeaguePass() {
   const notify = useNotice();
   const queryClient = useQueryClient();
   const settings = useLpSettings(userId);
+  const teams = useTeams();
   const current = settings.data ?? LP_DEFAULTS;
 
   const save = useMutation({
@@ -190,6 +191,22 @@ function LeaguePass() {
   return (
     <Card title="League Pass">
       <div className="space-y-4">
+        <Field label="Favorite team" hint="Its game is pinned to the top of the games list.">
+          <select
+            className={inputClass}
+            value={shown.favorite_team_id ?? ""}
+            onChange={(e) => {
+              const id = e.target.value ? Number(e.target.value) : null;
+              const name = teams.data?.find((t) => t.id === id)?.name;
+              save.mutate({ ...shown, favorite_team_id: id }, { onSuccess: () => notify(name ? `${name} pinned to the top.` : "Favorite team cleared.") });
+            }}
+          >
+            <option value="">None</option>
+            {teams.data?.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </Field>
         {LP_TOGGLES.map((t) => (
           <Toggle
             key={t.key}

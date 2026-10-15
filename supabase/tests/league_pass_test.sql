@@ -156,6 +156,8 @@ set role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'g')::text, false);
 insert into public.lp_settings (user_id, notify_daily, notify_must_watch) values (:'g', false, false);
 select test.check((select hide_scores from public.lp_settings), 'scores hidden by default');
+update public.lp_settings set favorite_team_id = 2;
+select test.check((select favorite_team_id = 2 from public.lp_settings), 'can set a favorite team');
 select test.expect_error(format('insert into public.lp_settings (user_id) values (%L)', :'e'), 'row-level security');
 select set_config('request.jwt.claims', json_build_object('sub', :'e')::text, false);
 select test.check((select count(*) = 0 from public.lp_settings), 'cannot see another user''s settings');

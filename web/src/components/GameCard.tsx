@@ -5,8 +5,10 @@ import type { Suggestion, Team } from "../lib/types";
 import { StarRating } from "./StarRating";
 import { TeamLogo, teamColor } from "./team";
 
-export function GameCard({ game, teams, hideScores, onRate, rating, comments = 0 }: {
+export function GameCard({ game, teams, hideScores, onRate, rating, comments = 0, favorite }: {
   game: Suggestion;
+  /** The user's favorite team plays in it: gold border and a "Your team" tag. */
+  favorite?: boolean;
   teams: Map<number, Team>;
   hideScores: boolean;
   onRate: (stars: number | null) => void;
@@ -26,7 +28,12 @@ export function GameCard({ game, teams, hideScores, onRate, rating, comments = 0
   const matchup = `${away.name} at ${home.name}`;
 
   return (
-    <article className="rounded-2xl bg-panel p-4 ring-1 ring-line/70" aria-label={matchup}>
+    <article className={`relative rounded-2xl bg-panel p-4 ${favorite ? "ring-2 ring-gold" : "ring-1 ring-line/70"}`} aria-label={matchup}>
+      {favorite && (
+        <span className="absolute -top-2.5 left-4 rounded-full bg-gold px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-night">
+          Your team
+        </span>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs font-semibold text-mute">
           {game.status === "postponed" ? "Postponed" : game.status === "canceled" ? "Canceled" : tipoffTime(game.tipoff)}
