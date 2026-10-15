@@ -1,0 +1,6 @@
+# Minimal config for the Supabase CLI (`supabase db push`, and `supabase start` for a local stack).
+project_id = "nba-wins-league"
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/**", "http://localhost:8080/**"]

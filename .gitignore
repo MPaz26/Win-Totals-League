@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# GitLab Pages output (CI only)
+/public/
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/

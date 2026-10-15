@@ -1,0 +1,24 @@
+# Local web app against your Supabase project (hosted, or `supabase start`).
+#   make dev               hot-reload dev server on http://localhost:5173
+#   make prod-preview      production build behind nginx on http://localhost:8080
+services:
+  web:
+    build:
+      context: ./web
+      target: dev
+    env_file: .env
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules # keep the container's Linux node_modules, not the host's
+
+  web-prod:
+    profiles: [prod]
+    build:
+      context: ./web
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "8080:80"

@@ -1,0 +1,17 @@
+{
+  "name": "nba-wins-league-jobs",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "update-standings": "node src/update-standings.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "~5.9.3"
+  }
+}
