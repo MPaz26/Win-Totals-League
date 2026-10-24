@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { InstallButton } from "../components/InstallGuide";
+import { snoozePushPrompt } from "../components/NotificationPrompt";
 import { Avatar, Button, Card, Field, InlineEdit, inputClass, Spinner, Toggle } from "../components/ui";
 import { signOut, useAuth, useUserId } from "../lib/auth";
 import { useNotice } from "../lib/notice";
@@ -70,6 +71,8 @@ function Notifications() {
     mutationFn: (on: boolean) => (on ? enablePush() : disablePush()),
     onSuccess: (_, on) => {
       queryClient.setQueryData(["pushDevice", userId], on);
+      // Switched off on purpose: don't keep asking on this device.
+      if (!on) snoozePushPrompt(true);
       notify(on ? "Notifications on for this device." : "Notifications off for this device.");
     },
     onError: (err) => notify(err.message, "error"),
