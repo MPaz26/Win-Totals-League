@@ -1,4 +1,6 @@
 # Daily standings refresh from ESPN, then League Pass games (scores for the last few days).
+# The safety net behind live scores (the update-scores Edge Function), and the only writer of
+# the dated standings history the weekly recap uses.
 # Also runnable by hand from the Actions tab; pick games_mode "season" once per season to
 # load the whole schedule. A failed run leaves the last good data in place and GitHub emails you.
 #
@@ -30,7 +32,7 @@ jobs:
       run:
         working-directory: jobs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # the whole repo: the jobs import supabase/functions/_shared
       - uses: actions/setup-node@v4
         with:
           node-version: 24

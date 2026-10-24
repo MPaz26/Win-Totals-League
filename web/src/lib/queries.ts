@@ -35,7 +35,7 @@ export function useWeeklyRecap(userId: string) {
   });
 }
 
-// League Pass. Games and scores change once a day (the morning load), so these stay fresh a while.
+// League Pass. Scores update every few minutes during games (useLiveScoresRealtime refreshes these).
 
 /** The caller's saved order as team ids, favorite first; null until they've saved one. */
 export function useLpRankings(userId: string) {
@@ -164,6 +164,41 @@ export function useGameCommentsRealtime(id: string) {
       supabase.removeChannel(channel);
     };
   }, [id, queryClient]);
+}
+
+/**
+ * Refreshes scores and standings everywhere when the live-scores function writes new ones.
+ * A run updates a night's games at once, so the burst of row events is folded into one refresh.
+ */
+export function useLiveScoresRealtime(enabled: boolean) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!enabled) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const pending = new Set<string>();
+    const refresh = (...keys: string[]) => () => {
+      keys.forEach((k) => pending.add(k));
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        for (const key of pending) queryClient.invalidateQueries({ queryKey: [key] });
+        pending.clear();
+      }, 1_000);
+    };
+
+    const channel = supabase
+      .channel("live-scores")
+      .on("postgres_changes", { event: "*", schema: "public", table: "nba_games" }, refresh("game", "lpSuggestions"))
+      // Records feed league scoreboards and League Pass watch scores.
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_standings" },
+        refresh("standings", "scoreboard", "myScores", "lpSuggestions"))
+      .subscribe();
+
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [enabled, queryClient]);
 }
 
 export function useMyLeagues() {

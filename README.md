@@ -5,7 +5,8 @@ Draft all 30 NBA teams among friends. Each owner's score is the combined regular
 - **web/**: React + Vite + Tailwind single-page app, hosted on GitHub Pages.
 - **supabase/**: Postgres schema, row-level security, and the draft RPCs. Clients never write tables directly; every change goes through a `SECURITY DEFINER` function that checks the caller and locks the league row.
 - **supabase/functions/send-push**: an Edge Function that sends Web Push notifications.
-- **jobs/**: a daily job that pulls standings and game scores from ESPN into `team_standings` and `nba_games`, and a weekly recap email sent from a Gmail account.
+- **supabase/functions/update-scores**: an Edge Function that refreshes scores and standings from ESPN while games are on.
+- **jobs/**: a daily job that pulls standings and game scores from ESPN into `team_standings` and `nba_games` (the safety net behind live scores), and a weekly recap email sent from a Gmail account. The ESPN parsing is shared with `update-scores`, in `supabase/functions/_shared/espn.mts`.
 
 ## How a league works
 
@@ -13,7 +14,7 @@ Draft all 30 NBA teams among friends. Each owner's score is the combined regular
 2. Create a league and share its invite link. Anyone with the link can join until the draft starts (2–30 members).
 3. The commissioner sets the pick timer, snake vs. linear order, and random vs. manual order, then starts the draft.
 4. The draft room updates live (Supabase Realtime). When the clock runs out, the best remaining team by last season's wins is picked automatically. Open browsers trigger this the moment time expires; a pg_cron job every 15 seconds is the backstop.
-5. After the draft, the league page shows the standings, updated daily.
+5. After the draft, the league page shows the standings, updated within minutes of each game ending.
 
 ## League Pass
 
@@ -29,6 +30,10 @@ The score (`private.lp_scores`, last redefined in `supabase/migrations/202610190
 If you've ranked your teams and turned on notifications, you get the night's best game at 21:00 UTC, and an alert about 30 minutes before any game you'd score 80+. Both can be turned off on your profile. They're sent by pg_cron (`20261018000100_league_pass_cron.sql`).
 
 The schedule is stored in `nba_games`. Load the whole season once, by running the Standings workflow by hand with **games_mode: season** (or `make games-backfill`). After that, the daily run only fetches the last three days through tomorrow: it updates scores and statuses, and adds games that weren't known yet (NBA Cup knockouts, playoffs). The app reads from the database only and never calls ESPN.
+
+### Live scores
+
+During games, scores and standings update every 5 minutes. A `pg_cron` job checks the stored schedule and only calls the `update-scores` Edge Function when a game is on (or tips off within 10 minutes), or when a game went final and standings haven't caught up yet. That run fetches just the scoreboard for that day (one ESPN request) and, as games go final, the standings. Off nights and daytime make no ESPN requests; a busy night is roughly 70 scoreboard and a dozen standings requests. Open pages refresh through Realtime. The daily job still runs as the safety net and writes the history snapshots the weekly recap uses. Live scores need the **Edge functions** workflow (below) to have run.
 
 Username, notification and email settings are on the profile page (the avatar at the top right). The **Get the app** button in the header explains how to add the site to a phone's Home Screen; on iPhone that's required for notifications.
 
@@ -76,7 +81,7 @@ How it fits together: each device's subscription is saved in `push_subscriptions
 1. `make vapid-keys` and keep both keys. Make a push secret: `openssl rand -hex 32`.
 2. Create a Supabase access token (Account → Access Tokens).
 3. Add repository **variables** `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT` (`mailto:you@example.com`), `SUPABASE_PROJECT_REF`, and **secrets** `VAPID_PRIVATE_KEY`, `PUSH_SECRET`, `SUPABASE_ACCESS_TOKEN`.
-4. Run **Migrate database**, then **Push notifications** from the Actions tab, then let CI redeploy the site (it bakes in the public key).
+4. Run **Migrate database**, then **Edge functions** from the Actions tab, then let CI redeploy the site (it bakes in the public key).
 5. On your phone: Get the app → open it from the Home Screen → Profile → turn on notifications → **Send a test**.
 
 For local dev, put `VITE_VAPID_PUBLIC_KEY` and `PUSH_SECRET` in `.env`. Keep the same keys afterwards: changing the VAPID pair invalidates every saved subscription, and everyone has to turn notifications on again.
@@ -86,10 +91,10 @@ For local dev, put `VITE_VAPID_PUBLIC_KEY` and `PUSH_SECRET` in `.env`. Keep the
 Five workflows live in `.github/workflows/`:
 
 - **CI** checks every push and PR, and deploys `main` to GitHub Pages (Settings → Pages → Source: **GitHub Actions**).
-- **Standings** runs daily at 11:00 UTC. It refreshes standings, then League Pass games and scores. If a step fails (ESPN is down, or the data looks wrong), that step writes nothing, so the last good numbers stay. Run it by hand with **games_mode: season** to load a season's schedule.
+- **Standings** runs daily at 11:00 UTC (GitHub often starts it hours late). It refreshes standings, then League Pass games and scores, catching any corrections the live updates missed. If a step fails (ESPN is down, or the data looks wrong), that step writes nothing, so the last good numbers stay. Run it by hand with **games_mode: season** to load a season's schedule.
 - **Weekly recap** emails every member of a drafted league on Mondays at 14:00 UTC: league standings, their teams, and wins gained since the snapshot a week earlier. It skips the preseason and weeks with no games. Run it by hand to send a test to one address, or as a dry run.
 - **Migrate database** applies new migrations; run it by hand from the Actions tab.
-- **Push notifications** deploys the `send-push` Edge Function and its secrets, and points the database at it. It runs when the function changes, or by hand.
+- **Edge functions** deploys `send-push` and `update-scores` and their secrets, and points the database at them. It runs when a function changes, or by hand. Until it has run, there are no notifications and scores only update daily.
 
 In Settings → Secrets and variables → Actions, add **variables** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `APP_URL`, `GMAIL_USER` and **secrets** `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL`, `GMAIL_APP_PASSWORD` (plus the push notification ones above). Free accounts can only use Pages on public repos; that's fine, since no secrets are in the code.
 

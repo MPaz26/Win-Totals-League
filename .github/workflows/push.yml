@@ -1,10 +1,12 @@
-# Deploys the send-push Edge Function, sets its secrets, and tells the database where it
-# lives (private.push_config), so on-the-clock notifications start flowing. Runs on changes to
-# the function, or by hand from the Actions tab after changing a key. Needs the push migration applied.
+# Deploys the Edge Functions (send-push for notifications, update-scores for live scores), sets
+# their secrets, and tells the database where they live and the secret to send
+# (private.push_config). Until then no pushes go out and scores only update daily. Runs on
+# changes to the functions, or by hand from the Actions tab after changing a key. Needs the
+# migrations applied first.
 #
 # Repository variables: SUPABASE_URL, SUPABASE_PROJECT_REF, VAPID_PUBLIC_KEY, VAPID_SUBJECT
 # Repository secrets:   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_URL, VAPID_PRIVATE_KEY, PUSH_SECRET
-name: Push notifications
+name: Edge functions
 
 on:
   push:
@@ -38,6 +40,8 @@ jobs:
           PUSH_SECRET: ${{ secrets.PUSH_SECRET }}
       - name: Deploy send-push
         run: npx --yes supabase@2 functions deploy send-push --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
+      - name: Deploy update-scores
+        run: npx --yes supabase@2 functions deploy update-scores --project-ref "$PROJECT_REF" --no-verify-jwt --use-api
       - name: Point the database at it
         # psql variables (:'url') quote the values, so no SQL is built by string pasting.
         run: |

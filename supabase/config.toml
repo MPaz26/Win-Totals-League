@@ -9,3 +9,7 @@ additional_redirect_urls = ["http://localhost:5173/**", "http://localhost:8080/*
 # users for a test push; the function checks both itself.
 [functions.send-push]
 verify_jwt = false
+
+# Called only by the database (pg_cron + pg_net) with the same shared secret as send-push.
+[functions.update-scores]
+verify_jwt = false

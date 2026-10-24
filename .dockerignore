@@ -1,0 +1,6 @@
+# Only the jobs image builds from the repo root; it needs just these.
+*
+!jobs/package.json
+!jobs/package-lock.json
+!jobs/src
+!supabase/functions/_shared

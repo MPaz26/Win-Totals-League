@@ -1,4 +1,6 @@
-// Daily standings refresh (scheduled GitHub Actions workflow, or `make standings`).
+// Daily standings refresh (scheduled GitHub Actions workflow, or `make standings`). During games
+// the update-scores Edge Function keeps team_standings current; this run is the safety net,
+// and the only writer of the dated history rows the weekly recap compares against.
 //
 // Pulls regular-season W-L from ESPN, sanity-checks it, then upserts team_standings
 // (what the scoreboard reads) and a dated row in team_standings_history.
@@ -12,68 +14,15 @@
 //   ALLOW_WIN_DECREASE=1  accept a team's wins going down (ESPN correction)
 
 import { createClient } from "@supabase/supabase-js";
-import { fetchJson, nbaDate, requireEnv } from "./lib.ts";
+import { fetchStandings, nbaDate } from "../../supabase/functions/_shared/espn.mts";
+import { requireEnv } from "./lib.ts";
 
 const SEASON = Number(process.env.NBA_SEASON ?? "2027");
 const DRY_RUN = process.env.DRY_RUN === "1";
 const ALLOW_WIN_DECREASE = process.env.ALLOW_WIN_DECREASE === "1";
-const REGULAR_SEASON = 2; // ESPN seasontype; without it ESPN serves preseason records in October
-const GAMES = 82;
-const URL = `https://site.api.espn.com/apis/v2/sports/basketball/nba/standings?season=${SEASON}&seasontype=${REGULAR_SEASON}`;
-
-interface Standing {
-  team_id: number;
-  abbr: string;
-  wins: number;
-  losses: number;
-}
-
-interface EspnStandings {
-  children?: {
-    abbreviation: string;
-    standings: {
-      season: number;
-      seasonType: number;
-      entries: {
-        team: { id: string; abbreviation: string };
-        stats: { name: string; value?: number }[];
-      }[];
-    };
-  }[];
-}
-
-function parse(data: EspnStandings): Standing[] {
-  const conferences = data.children ?? [];
-  if (conferences.length !== 2) throw new Error(`Expected 2 conferences, got ${conferences.length}`);
-
-  const rows: Standing[] = [];
-  for (const conf of conferences) {
-    const { season, seasonType, entries } = conf.standings;
-    if (season !== SEASON || seasonType !== REGULAR_SEASON) {
-      throw new Error(`${conf.abbreviation}: got season ${season} type ${seasonType}, wanted ${SEASON} type ${REGULAR_SEASON}`);
-    }
-    for (const { team, stats } of entries) {
-      const stat = (name: string) => {
-        const v = stats.find((s) => s.name === name)?.value;
-        if (v === undefined || !Number.isInteger(v) || v < 0) throw new Error(`${team.abbreviation}: bad ${name} ${v}`);
-        return v;
-      };
-      rows.push({ team_id: Number(team.id), abbr: team.abbreviation, wins: stat("wins"), losses: stat("losses") });
-    }
-  }
-
-  const ids = new Set(rows.map((r) => r.team_id));
-  if (rows.length !== 30 || ids.size !== 30 || [...ids].some((id) => !(id >= 1 && id <= 30))) {
-    throw new Error(`Expected ESPN team ids 1-30 exactly once, got ${[...ids].sort((a, b) => a - b).join(",")}`);
-  }
-  for (const r of rows) {
-    if (r.wins + r.losses > GAMES) throw new Error(`${r.abbr}: ${r.wins}-${r.losses} is more than ${GAMES} games`);
-  }
-  return rows.sort((a, b) => b.wins - a.wins || a.losses - b.losses);
-}
 
 async function main() {
-  const rows = parse((await fetchJson(URL)) as EspnStandings);
+  const rows = await fetchStandings(SEASON);
   console.log(`ESPN ${SEASON} regular season: ${rows.reduce((n, r) => n + r.wins, 0)} total wins across 30 teams`);
   console.table(rows.map(({ abbr, wins, losses }) => ({ team: abbr, wins, losses })));
 
