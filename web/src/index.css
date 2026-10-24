@@ -19,6 +19,8 @@
 }
 
 :root {
+  /* The phone tab bar's height (components/Layout.tsx); other bottom bars sit on top of it. */
+  --tab-bar: calc(3.75rem + env(safe-area-inset-bottom));
   color-scheme: dark;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -32,4 +34,10 @@ body {
 
 ::selection {
   background: rgb(22 217 192 / 0.35);
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --tab-bar: 0px;
+  }
 }

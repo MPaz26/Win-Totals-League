@@ -28,7 +28,7 @@ export function League() {
       <Card className="mx-auto max-w-md text-center">
         <h1 className="text-lg font-extrabold">League not found</h1>
         <p className="mt-1 text-sm text-mute">
-          It doesn't exist, or you're not a member. <Link to="/" className="font-semibold text-mint hover:underline">Back to your leagues</Link>
+          It doesn't exist, or you're not a member. <Link to="/leagues" className="font-semibold text-mint hover:underline">Back to your leagues</Link>
         </p>
       </Card>
     );
@@ -58,7 +58,7 @@ export function League() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3 sm:gap-4">
-        <Link to="/" className="-ml-1 px-1 text-3xl leading-none text-faint hover:text-ink" aria-label="Back to leagues">‹</Link>
+        <Link to="/leagues" className="-ml-1 px-1 text-3xl leading-none text-faint hover:text-ink" aria-label="Back to leagues">‹</Link>
         <LeagueMark name={data.league.name} className="h-12 w-12 text-base sm:h-14 sm:w-14 sm:text-lg" />
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">

@@ -28,7 +28,7 @@ export function Lobby({ league, members }: LeagueData) {
     onSuccess: (_, user) => {
       if (user === userId) {
         queryClient.invalidateQueries({ queryKey: ["myLeagues"] });
-        navigate("/");
+        navigate("/leagues");
         notify(`You left ${league.name}.`);
       } else refresh();
     },

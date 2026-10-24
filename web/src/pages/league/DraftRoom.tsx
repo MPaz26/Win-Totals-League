@@ -219,7 +219,7 @@ export function DraftRoom({ league, members, picks, teams }: LeagueData) {
 
       {/* Phones: tap a team, then confirm here, within thumb reach. */}
       {selectedTeam && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+        <div className="fixed inset-x-0 bottom-[var(--tab-bar)] z-40 border-t border-line bg-panel/95 px-4 py-3 backdrop-blur sm:hidden">
           <div className="flex items-center gap-3">
             <TeamLogo abbr={selectedTeam.abbr} className="h-10 w-10" />
             <div className="min-w-0 flex-1">

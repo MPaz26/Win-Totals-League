@@ -6,6 +6,7 @@ import { useAuth } from "./lib/auth";
 import { Home } from "./pages/Home";
 import { Join } from "./pages/Join";
 import { League } from "./pages/League";
+import { Leagues } from "./pages/Leagues";
 import { Profile } from "./pages/Profile";
 import { ProfileSetup } from "./pages/ProfileSetup";
 import { SignIn } from "./pages/SignIn";
@@ -23,6 +24,7 @@ export function App() {
         <Route path="/join/:code" element={<Join />} />
         <Route path="/unsubscribe/:token" element={<Unsubscribe />} />
         <Route path="/" element={<Gate><Home /></Gate>} />
+        <Route path="/leagues" element={<Gate><Leagues /></Gate>} />
         <Route path="/league/:id" element={<Gate><League /></Gate>} />
         <Route path="/profile" element={<Gate><Profile /></Gate>} />
         <Route path="/watch" element={<Gate><Tonight /></Gate>} />

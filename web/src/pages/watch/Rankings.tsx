@@ -107,7 +107,7 @@ export function Rankings() {
       </DndContext>
 
       {dirty && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-panel/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+        <div className="fixed inset-x-0 bottom-[var(--tab-bar)] z-30 border-t border-line bg-panel/95 pb-3 backdrop-blur sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto flex max-w-xl items-center justify-between gap-3 px-4 pt-3">
             <span className="text-sm font-semibold text-mute">{saved.data ? "Unsaved changes" : "Save to start getting picks"}</span>
             <div className="flex gap-2">
