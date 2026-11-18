@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { rows, rpc, supabase } from "./supabase";
-import type { CommunityRank, Game, GameComment, League, LeaguePreview, LpSettings, Member, Pick, ScoreRow, Standing, Suggestion, Team } from "./types";
+import type { CommunityRank, Game, GameComment, League, LeaguePreview, LpSettings, Member, Pick, ScoreRow, Standing, Suggestion, Team, TeamRecord, Trade } from "./types";
 
 // ESPN convention: 2027 = the 2026-27 season. Keep in step with NBA_SEASON in the standings job.
 export const SEASON = 2027;
@@ -191,7 +191,7 @@ export function useLiveScoresRealtime(enabled: boolean) {
       .on("postgres_changes", { event: "*", schema: "public", table: "nba_games" }, refresh("game", "lpSuggestions"))
       // Records feed league scoreboards and League Pass watch scores.
       .on("postgres_changes", { event: "*", schema: "public", table: "team_standings" },
-        refresh("standings", "scoreboard", "myScores", "lpSuggestions"))
+        refresh("standings", "scoreboard", "teamRecords", "myScores", "lpSuggestions"))
       .subscribe();
 
     return () => {
@@ -265,6 +265,29 @@ export function useScoreboard(id: string) {
   });
 }
 
+/** Each manager's record with each team they own or traded away, counting only games after the draft day. */
+export function useTeamRecords(id: string) {
+  return useQuery({
+    queryKey: ["teamRecords", id],
+    queryFn: () => rows<TeamRecord[]>(supabase.from("league_team_records").select("*").eq("league_id", id)),
+  });
+}
+
+/** Every trade offered in the league, newest first. */
+export function useTrades(id: string) {
+  return useQuery({
+    queryKey: ["trades", id],
+    queryFn: () =>
+      rows<Trade[]>(
+        supabase
+          .from("trades")
+          .select("*, teams:trade_teams(team_id, from_user_id, to_user_id)")
+          .eq("league_id", id)
+          .order("created_at", { ascending: false }),
+      ),
+  });
+}
+
 // Keyed on the viewer too: is_member flips when someone signs in on the invite page.
 export function useLeaguePreview(code: string, userId: string | undefined) {
   return useQuery({
@@ -298,11 +321,13 @@ export function useLeagueRealtime(id: string) {
     const refresh = (...keys: string[]) => () => {
       for (const key of keys) queryClient.invalidateQueries({ queryKey: [key, id] });
     };
-    const all = refresh("league", "members", "picks", "scoreboard");
+    const all = refresh("league", "members", "picks", "scoreboard", "teamRecords", "trades");
 
     const channel = supabase
       .channel(`league:${id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "leagues", filter: `id=eq.${id}` }, refresh("league"))
+      .on("postgres_changes", { event: "*", schema: "public", table: "leagues", filter: `id=eq.${id}` },
+        // Finishing the draft sets the day wins start counting from.
+        refresh("league", "scoreboard", "teamRecords"))
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "league_members", filter: `league_id=eq.${id}` },
@@ -313,7 +338,13 @@ export function useLeagueRealtime(id: string) {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "draft_picks", filter: `league_id=eq.${id}` },
-        refresh("picks", "scoreboard"),
+        refresh("picks", "scoreboard", "teamRecords"),
+      )
+      // An accepted trade moves teams between rosters.
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trades", filter: `league_id=eq.${id}` },
+        refresh("trades", "scoreboard", "teamRecords"),
       )
       .subscribe((status) => {
         // Catch up on anything that changed while the socket was connecting or reconnecting.

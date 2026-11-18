@@ -65,3 +65,9 @@ export function winPct(wins: number, losses: number): string {
   if (games === 0) return "—";
   return (wins / games).toFixed(3).replace(/^0/, "");
 }
+
+/** "Nov 19" for a YYYY-MM-DD date, optionally moved by some days. */
+export function shortDate(date: string, addDays = 0): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + addDays)).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+}

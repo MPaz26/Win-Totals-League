@@ -73,6 +73,8 @@ jobs:
       - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/draft_test.sql
       - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/league_pass_test.sql
       - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/live_scores_test.sql
+      - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/draft_day_test.sql
+      - run: psql -v ON_ERROR_STOP=1 -f supabase/tests/trades_test.sql
 
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

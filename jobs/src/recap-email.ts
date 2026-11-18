@@ -6,6 +6,8 @@ export interface RecapTeam {
   name: string;
   wins: number;
   losses: number;
+  /** Traded away: no longer on the roster, but the wins earned while owned still count. */
+  traded: boolean;
   /** Wins since the baseline snapshot; null when there's no baseline yet. */
   weekWins: number | null;
 }
@@ -96,7 +98,7 @@ export function renderText(r: Recap): string {
     ),
     "",
     "Your teams",
-    ...r.me.teams.map((t) => `${t.name}  ${t.wins}–${t.losses}${t.weekWins !== null ? `  (+${t.weekWins})` : ""}`),
+    ...r.me.teams.map((t) => `${t.name}${t.traded ? " (traded)" : ""}  ${t.wins}–${t.losses}${t.weekWins !== null ? `  (+${t.weekWins})` : ""}`),
     "",
     `League: ${r.leagueUrl}`,
     `Unsubscribe: ${r.unsubscribeUrl}`,
@@ -126,7 +128,7 @@ export function renderHtml(r: Recap): string {
     .map(
       (t) => `<tr>
         <td style="padding:8px 8px 8px 16px;border-top:1px solid ${C.line};width:32px">${logo(r.appUrl, t.abbr, 28)}</td>
-        <td style="padding:8px;border-top:1px solid ${C.line};color:${C.ink};font-weight:600">${escapeHtml(t.name)}</td>
+        <td style="padding:8px;border-top:1px solid ${C.line};color:${t.traded ? C.mute : C.ink};font-weight:600">${escapeHtml(t.name)}${t.traded ? ` <span style="font-weight:400;font-size:12px">traded</span>` : ""}</td>
         ${hasWeek ? `<td style="padding:8px;border-top:1px solid ${C.line};text-align:right;color:${C.mint};font-weight:700">${plus(t.weekWins)}</td>` : ""}
         <td style="padding:8px 16px 8px 8px;border-top:1px solid ${C.line};text-align:right;font-weight:700;color:${C.ink};white-space:nowrap">${t.wins}–${t.losses}</td>
       </tr>`,

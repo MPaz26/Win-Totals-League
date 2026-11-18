@@ -1,6 +1,6 @@
 # Win Totals League
 
-Draft all 30 NBA teams among friends. Each owner's score is the combined regular-season wins of the teams they drafted.
+Draft all 30 NBA teams among friends. Each owner's score is the combined regular-season wins of their teams, counted from the day after the draft and only while they own each team.
 
 - **web/**: React + Vite + Tailwind single-page app, hosted on GitHub Pages.
 - **supabase/**: Postgres schema, row-level security, and the draft RPCs. Clients never write tables directly; every change goes through a `SECURITY DEFINER` function that checks the caller and locks the league row.
@@ -14,7 +14,8 @@ Draft all 30 NBA teams among friends. Each owner's score is the combined regular
 2. Create a league and share its invite link. Anyone with the link can join until the draft starts (2–30 members).
 3. The commissioner sets the pick timer, snake vs. linear order, and random vs. manual order, then starts the draft.
 4. The draft room updates live (Supabase Realtime). When the clock runs out, the best remaining team by last season's wins is picked automatically. Open browsers trigger this the moment time expires; a pg_cron job every 15 seconds is the backstop.
-5. After the draft, the league page shows the standings, updated within minutes of each game ending.
+5. After the draft, the league page shows the standings, updated within minutes of each game ending. Only games after the draft day count, so a league drafted mid-season starts at 0–0.
+6. Owners can trade teams at any point in the season: any number of teams each way, at least one each. The other owner accepts or declines. Wins a team already earned stay with the owner who had it; the new owner counts its games from the day after the trade, so games on the trade day stay with the old owner. A team can be traded at most once in any 7 days. Rules and scoring are in `supabase/migrations/20261118000100_trades.sql`.
 
 ## League Pass
 
