@@ -69,6 +69,36 @@ export interface ScoreRow {
   team_name: string | null;
 }
 
+/**
+ * A row of league_team_records: a manager's record with a team they own or used to own, counting
+ * games after the league's draft day and only while they owned it.
+ */
+export interface TeamRecord {
+  league_id: string;
+  user_id: string;
+  team_id: number;
+  wins: number;
+  losses: number;
+  draft_date: string; // YYYY-MM-DD (Eastern); games that day and earlier don't count
+  owned: boolean; // on their roster now
+  acquired_on: string | null; // YYYY-MM-DD trade day they last got it in a trade; null if drafted
+  traded_on: string | null; // YYYY-MM-DD trade day they traded it away; null while owned
+}
+
+export type TradeStatus = "pending" | "accepted" | "declined" | "canceled" | "void";
+
+export interface Trade {
+  id: string;
+  league_id: string;
+  proposer_id: string;
+  recipient_id: string;
+  status: TradeStatus;
+  created_at: string;
+  decided_at: string | null;
+  effective_date: string | null;
+  teams: { team_id: number; from_user_id: string; to_user_id: string }[];
+}
+
 export interface LeaguePreview {
   id: string;
   name: string;

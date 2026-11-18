@@ -3,29 +3,41 @@ import { DraftBoard } from "../../components/DraftBoard";
 import { teamColor, TeamLogo } from "../../components/team";
 import { Avatar, Card, ErrorMessage, PageSpinner } from "../../components/ui";
 import { useUserId } from "../../lib/auth";
-import { winPct } from "../../lib/draft";
-import { useScoreboard, useStandings } from "../../lib/queries";
+import { shortDate, winPct } from "../../lib/draft";
+import { useScoreboard, useStandings, useTeamRecords } from "../../lib/queries";
 import type { LeagueData } from "../League";
+import { Trades } from "./Trades";
 
 export function Results({ league, members, picks, teams }: LeagueData) {
   const userId = useUserId();
   const scoreboard = useScoreboard(league.id);
   const standings = useStandings();
+  const teamRecords = useTeamRecords(league.id);
   const [open, setOpen] = useState<string | null>(userId);
   const [showBoard, setShowBoard] = useState(false);
 
-  if (scoreboard.error ?? standings.error) return <ErrorMessage error={scoreboard.error ?? standings.error} />;
-  if (scoreboard.isPending || standings.isPending) return <PageSpinner />;
+  if (scoreboard.error ?? standings.error ?? teamRecords.error) {
+    return <ErrorMessage error={scoreboard.error ?? standings.error ?? teamRecords.error} />;
+  }
+  if (scoreboard.isPending || standings.isPending || teamRecords.isPending) return <PageSpinner />;
 
-  const record = new Map(standings.data.map((s) => [s.team_id, s]));
+  // Records in this league count only games after the draft day, not the whole season, and
+  // only while the manager owned the team. Across a team's owners they add up to the games
+  // since the draft, so a team whose season record is bigger means the league drafted mid-season.
+  const games = new Map<number, number>();
+  for (const r of teamRecords.data) games.set(r.team_id, (games.get(r.team_id) ?? 0) + r.wins + r.losses);
+  const draftedMidSeason = standings.data.some((s) => games.has(s.team_id) && s.wins + s.losses > games.get(s.team_id)!);
+  const countingFrom = draftedMidSeason ? shortDate(teamRecords.data[0].draft_date, 1) : null;
   const updated = standings.data.reduce<string | null>((max, s) => (!max || s.updated_at > max ? s.updated_at : max), null);
   const seasonStarted = standings.data.some((s) => s.wins + s.losses > 0);
 
+  // Teams on the roster now, best first, then the ones traded away (their wins still count).
   const rosterOf = (user: string) =>
-    picks
-      .filter((p) => p.user_id === user)
-      .map((p) => ({ pick: p, team: teams.get(p.team_id)!, record: record.get(p.team_id) }))
-      .sort((a, b) => (b.record?.wins ?? 0) - (a.record?.wins ?? 0) || a.pick.pick_number - b.pick.pick_number);
+    teamRecords.data
+      .filter((r) => r.user_id === user)
+      .map((r) => ({ record: r, team: teams.get(r.team_id)!, pick: picks.find((p) => p.team_id === r.team_id && p.user_id === user) }))
+      .sort((a, b) => Number(b.record.owned) - Number(a.record.owned) || b.record.wins - a.record.wins ||
+        (a.pick?.pick_number ?? 99) - (b.pick?.pick_number ?? 99));
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -41,6 +53,11 @@ export function Results({ league, members, picks, teams }: LeagueData) {
         {!seasonStarted && (
           <p className="mx-4 mb-4 rounded-xl sm:mx-5 bg-night/60 p-3 text-sm text-mute ring-1 ring-line/60">
             The regular season hasn't started yet. Standings update once a day after games begin.
+          </p>
+        )}
+        {countingFrom && (
+          <p className="mx-4 mb-4 sm:mx-5 text-xs text-mute">
+            Drafted mid-season: only games from {countingFrom} on count.
           </p>
         )}
         <div className="flex items-center gap-3 border-y border-line/70 bg-night/40 px-4 py-2 text-[10px] sm:px-5 font-bold uppercase tracking-wider text-faint">
@@ -72,7 +89,7 @@ export function Results({ league, members, picks, teams }: LeagueData) {
                       )}
                     </span>
                     <span className="mt-1 flex items-center gap-0.5 overflow-hidden">
-                      {rosterOf(row.user_id).map(({ team }) => (
+                      {rosterOf(row.user_id).filter(({ record }) => record.owned).map(({ team }) => (
                         <TeamLogo key={team.id} abbr={team.abbr} className="h-4 w-4 sm:h-5 sm:w-5" />
                       ))}
                     </span>
@@ -88,19 +105,22 @@ export function Results({ league, members, picks, teams }: LeagueData) {
                     {rosterOf(row.user_id).map(({ pick, team, record }) => (
                       <li
                         key={team.id}
-                        className="flex items-center gap-3 px-4 py-2.5"
-                        style={{ boxShadow: `inset 3px 0 0 ${teamColor(team.abbr)}` }}
+                        className={`flex items-center gap-3 px-4 py-2.5 ${record.owned ? "" : "opacity-60"}`}
+                        style={{ boxShadow: `inset 3px 0 0 ${record.owned ? teamColor(team.abbr) : "transparent"}` }}
                       >
                         <TeamLogo abbr={team.abbr} className="h-8 w-8" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold">{team.name}</span>
                           <span className="block text-xs text-faint">
-                            Pick {pick.pick_number}
-                            {pick.auto && " · auto"}
+                            {record.traded_on
+                              ? `Traded away ${shortDate(record.traded_on)}`
+                              : record.acquired_on
+                                ? `Acquired ${shortDate(record.acquired_on)}`
+                                : pick && `Pick ${pick.pick_number}${pick.auto ? " · auto" : ""}`}
                           </span>
                         </span>
                         <span className="text-sm font-bold tabular-nums">
-                          {record ? `${record.wins}–${record.losses}` : "0–0"}
+                          {record.wins}–{record.losses}
                         </span>
                       </li>
                     ))}
@@ -111,6 +131,8 @@ export function Results({ league, members, picks, teams }: LeagueData) {
           })}
         </ul>
       </Card>
+
+      <Trades league={league} members={members} teams={teams} records={teamRecords.data} />
 
       <Card
         title="Draft board"

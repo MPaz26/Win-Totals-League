@@ -18,7 +18,7 @@ check:
 	docker run --rm -v "$(CURDIR)":/repo -w /repo/jobs $(NODE_IMAGE) sh -c 'npm ci --no-audit --no-fund && npm run typecheck'
 
 # Applies the migrations to a throwaway plain Postgres (with supabase_shim.sql standing in
-# for Supabase's roles and auth schema) and runs the draft, League Pass and live scores scenarios. The pg_cron and pg_net migrations
+# for Supabase's roles and auth schema) and runs the draft, League Pass, live scores and draft-day scoring scenarios. The pg_cron and pg_net migrations
 # are skipped: plain Postgres ships neither. The test drives the autopick backstop directly, and the
 # shim's net.http_post records push requests instead of sending them.
 test-db:
@@ -31,7 +31,9 @@ test-db:
 	  for f in /supabase/migrations/*.sql; do case "$$f" in *cron*|*pg_net*) ;; *) run "$$f";; esac; done; \
 	  run /supabase/tests/draft_test.sql; \
 	  run /supabase/tests/league_pass_test.sql; \
-	  run /supabase/tests/live_scores_test.sql' \
+	  run /supabase/tests/live_scores_test.sql; \
+	  run /supabase/tests/draft_day_test.sql; \
+	  run /supabase/tests/trades_test.sql' \
 	; status=$$?; docker rm -f $(TEST_DB) >/dev/null; exit $$status
 
 # Daily standings refresh, reading SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / NBA_SEASON from .env.

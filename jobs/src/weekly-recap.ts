@@ -24,7 +24,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { nbaDate, requireEnv } from "./lib.ts";
-import { pushText, renderHtml, renderText, subject, type Recap, type RecapRow } from "./recap-email.ts";
+import { pushText, renderHtml, renderText, subject, type Recap, type RecapRow, type RecapTeam } from "./recap-email.ts";
 
 const SEASON = Number(process.env.NBA_SEASON ?? "2027");
 const DRY_RUN = process.env.DRY_RUN === "1";
@@ -36,7 +36,16 @@ const SEND_GAP_MS = 1_000; // Gmail allows ~500 recipients/day; no need to rush 
 interface Team { id: number; abbr: string; name: string }
 interface WinLoss { wins: number; losses: number }
 interface Member { league_id: string; user_id: string; profile: { username: string } }
-interface Pick { league_id: string; user_id: string; team_id: number; pick_number: number }
+interface Stint {
+  league_id: string;
+  team_id: number;
+  user_id: string;
+  start_date: string; // counts games after this day
+  end_date: string | null; // through this day; null = still owned
+  wins: number;
+  losses: number;
+}
+interface WeekGame { game_date: string; home_team_id: number; away_team_id: number; home_score: number | null; away_score: number | null }
 interface ScoreRow { league_id: string; user_id: string; username: string; team_name: string | null; wins: number; losses: number; place: number }
 
 interface Outgoing {
@@ -106,8 +115,29 @@ async function main() {
   }
   const ids = leagues.map((l) => l.id);
   const members = await q<Member[]>(db.from("league_members").select("league_id, user_id, profile:profiles(username)").in("league_id", ids));
-  const picks = await q<Pick[]>(db.from("draft_picks").select("league_id, user_id, team_id, pick_number").in("league_id", ids));
   const scores = await q<ScoreRow[]>(db.from("league_scoreboard").select("league_id, user_id, username, team_name, wins, losses, place").in("league_id", ids));
+  // Who owned each team when: the draft, then each accepted trade. A manager's wins with a team
+  // are the games after the draft day (or trade day) while they owned it.
+  const stints = await q<Stint[]>(
+    db.from("league_roster_stints").select("league_id, team_id, user_id, start_date, end_date, wins, losses").in("league_id", ids),
+  );
+  // This week's finals, for owners who traded a team away during the week. The baseline
+  // snapshot is taken the morning of baselineDate, so the week is games from that day on.
+  const weekGames = baselineDate
+    ? await q<WeekGame[]>(
+        db.from("nba_games").select("game_date, home_team_id, away_team_id, home_score, away_score")
+          .eq("season", SEASON).eq("season_type", 2).eq("status", "final").gte("game_date", baselineDate),
+      )
+    : [];
+  const stintWeekWins = (st: Stint): number => {
+    // Still owned: the team's week, but none from before the stint began. If it began this week,
+    // all of its wins are this week's.
+    if (st.end_date === null) return Math.min(weekWins(st.team_id)!, st.wins);
+    return weekGames.filter((g) =>
+      g.game_date > st.start_date && g.game_date <= st.end_date! &&
+      (g.home_team_id === st.team_id ? g.home_score! > g.away_score! : g.away_team_id === st.team_id && g.away_score! > g.home_score!),
+    ).length;
+  };
 
   const recipients = [...new Set(members.map((m) => m.user_id))];
   const emails = await userEmails(db);
@@ -123,14 +153,21 @@ async function main() {
       .filter((s) => s.league_id === league.id)
       .sort((a, b) => a.place - b.place || a.username.localeCompare(b.username))
       .map((s) => {
-        const mine = picks.filter((p) => p.league_id === league.id && p.user_id === s.user_id);
-        const rosterTeams = mine
-          .map((p) => {
-            const team = teams.get(p.team_id)!;
-            const rec = current.get(p.team_id) ?? { wins: 0, losses: 0 };
-            return { abbr: team.abbr, name: team.name, wins: rec.wins, losses: rec.losses, weekWins: weekWins(p.team_id) };
-          })
-          .sort((a, b) => b.wins - a.wins || a.losses - b.losses);
+        const mine = stints.filter((st) => st.league_id === league.id && st.user_id === s.user_id);
+        // One row per team, owned now or traded away (its wins still count).
+        const byTeam = new Map<number, RecapTeam>();
+        for (const st of mine) {
+          const team = teams.get(st.team_id)!;
+          const row = byTeam.get(st.team_id) ??
+            { abbr: team.abbr, name: team.name, wins: 0, losses: 0, weekWins: baseline ? 0 : null, traded: true };
+          row.wins += st.wins;
+          row.losses += st.losses;
+          if (row.weekWins !== null) row.weekWins += stintWeekWins(st);
+          if (st.end_date === null) row.traded = false;
+          byTeam.set(st.team_id, row);
+        }
+        const rosterTeams = [...byTeam.values()]
+          .sort((a, b) => Number(a.traded) - Number(b.traded) || b.wins - a.wins || a.losses - b.losses);
         return {
           userId: s.user_id,
           username: s.username,
@@ -138,7 +175,7 @@ async function main() {
           place: s.place,
           wins: s.wins,
           losses: s.losses,
-          weekWins: baseline ? mine.reduce((n, p) => n + weekWins(p.team_id)!, 0) : null,
+          weekWins: baseline ? rosterTeams.reduce((n, t) => n + t.weekWins!, 0) : null,
           teams: rosterTeams,
         };
       });
